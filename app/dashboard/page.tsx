@@ -63,6 +63,7 @@ export default function DashboardPage() {
           </Link>
           <NavItem href="/dashboard" label="🤖  Agents" active />
           <NavItem href="/schedules" label="⏰  Schedules" />
+          <NavItem href="/settings"  label="⚙️  Settings" />
           <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
             <div style={{ padding: '0.5rem 0.75rem' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)', marginBottom: '0.15rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name || user?.email}</div>

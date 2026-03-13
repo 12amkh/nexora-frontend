@@ -17,7 +17,7 @@ interface Schedule {
   task_message: string
   is_active: boolean
   agent_id: number
-  agent_name?: string // enriched client-side
+  agent_name?: string
 }
 
 interface Agent {
@@ -31,12 +31,8 @@ interface TaskResult {
   result?: string
 }
 
-// Plan schedule limits — mirrors backend PLAN_SCHEDULE_LIMITS exactly
 const PLAN_LIMITS: Record<string, number> = {
-  free:     0,
-  starter:  3,
-  pro:      10,
-  business: 50,
+  free: 0, starter: 3, pro: 10, business: 50,
 }
 
 const PLAN_COLORS: Record<string, string> = {
@@ -44,8 +40,6 @@ const PLAN_COLORS: Record<string, string> = {
 }
 
 // ─── Friendly cron builder ────────────────────────────────────────────────────
-// Users pick simple dropdowns; we silently construct the cron string for them.
-// Think of cron like a recipe: minute + hour + day = when to fire.
 
 const REPEAT_OPTIONS = [
   { label: 'Every hour',  value: 'hourly'  },
@@ -64,7 +58,6 @@ const DAY_OPTIONS = [
   { label: 'Sunday',    value: '0' },
 ]
 
-// 24-hour list rendered as 12-hour AM/PM for human readability
 const TIME_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
   label: h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`,
   value: String(h),
@@ -78,7 +71,6 @@ const buildCron = (repeat: string, hour: string, day: string): string => {
   return `0 ${hour} * * *`
 }
 
-// Converts stored cron back to a human-readable sentence for the card display
 const cronToLabel = (cron: string): string => {
   if (cron === '0 * * * *') return 'Every hour'
   const parts = cron.split(' ')
@@ -106,21 +98,13 @@ export default function SchedulesPage() {
   const [error, setError]           = useState('')
   const [user, setUser]             = useState<{ email?: string; name?: string; plan?: string } | null>(null)
 
-  // Per-schedule task result keyed by schedule id
   const [taskResults, setTaskResults] = useState<Record<number, TaskResult>>({})
-  // Tracks which schedule's run button is disabled while a task runs
-  const [running, setRunning] = useState<Set<number>>(new Set())
-  // Tracks which schedule is being toggled (pause/resume) to show a loading state
-  const [toggling, setToggling] = useState<Set<number>>(new Set())
+  const [running, setRunning]         = useState<Set<number>>(new Set())
+  const [toggling, setToggling]       = useState<Set<number>>(new Set())
 
-  // Create form — friendly selectors only, cron built on submit
   const [form, setForm] = useState({
-    name:     '',
-    agent_id: '',
-    prompt:   '',
-    repeat:   'daily',
-    hour:     '9',
-    day:      '1',
+    name: '', agent_id: '', prompt: '',
+    repeat: 'daily', hour: '9', day: '1',
   })
 
   // ── Load on mount ──────────────────────────────────────────────────────────
@@ -134,24 +118,18 @@ export default function SchedulesPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      // Fetch schedules and agents in parallel — saves one round-trip
       const [schedRes, agentRes] = await Promise.all([
         api.get('/schedules/list'),
         api.get('/agents/list?limit=50'),
       ])
-
       const agentList: Agent[] = agentRes.data
       setAgents(agentList)
-
-      // Enrich each schedule with agent name so the card doesn't need a second request
       const agentMap = Object.fromEntries(agentList.map(a => [a.id, a.name]))
       const enriched = schedRes.data.map((s: Schedule) => ({
         ...s,
         agent_name: agentMap[s.agent_id] ?? 'Unknown agent',
       }))
       setSchedules(enriched)
-
-      // Pre-select first agent so the form has a valid default
       if (agentList.length > 0) {
         setForm(prev => ({ ...prev, agent_id: String(agentList[0].id) }))
       }
@@ -196,14 +174,11 @@ export default function SchedulesPage() {
     }
   }
 
-  // ── Pause / Resume toggle ──────────────────────────────────────────────────
-  // Like a light switch: PUT with the opposite of the current is_active value.
-  // We do an optimistic UI update first (instant feedback), then reload to confirm.
+  // ── Pause / Resume ─────────────────────────────────────────────────────────
   const handleToggle = async (schedule: Schedule) => {
     setToggling(prev => new Set(prev).add(schedule.id))
     try {
       await api.put(`/schedules/${schedule.id}`, { is_active: !schedule.is_active })
-      // Optimistic update — flip the badge immediately without a full reload
       setSchedules(prev =>
         prev.map(s => s.id === schedule.id ? { ...s, is_active: !s.is_active } : s)
       )
@@ -227,8 +202,6 @@ export default function SchedulesPage() {
   }
 
   // ── Manual trigger + polling ───────────────────────────────────────────────
-  // Celery returns task_id immediately. We then poll every 2s until it finishes.
-  // Analogy: like submitting a food order and watching the progress bar.
   const handleRun = async (scheduleId: number) => {
     setRunning(prev => new Set(prev).add(scheduleId))
     setTaskResults(prev => ({ ...prev, [scheduleId]: { scheduleId, status: 'pending' } }))
@@ -244,27 +217,35 @@ export default function SchedulesPage() {
     }
   }
 
-  // Polls every 2s. Celery returns status in UPPERCASE ("SUCCESS"/"FAILURE"),
-  // so we normalize with .toLowerCase() before comparing — critical fix.
+  // FIX: single clean if/else block — all branches inside the setInterval callback
+  // Previous version had a stray closing brace that kicked the else-if outside the callback
   const pollTask = (scheduleId: number, taskId: string) => {
     const interval = setInterval(async () => {
       try {
         const { data } = await api.get(`/schedules/task/${taskId}`)
-        const status = (data.status as string).toLowerCase() // normalize Celery uppercase
+        // Normalize to lowercase — Celery returns "SUCCESS"/"FAILURE" uppercase
+        const status = (data.status as string).toLowerCase()
 
         if (status === 'success') {
           clearInterval(interval)
           setRunning(prev => { const n = new Set(prev); n.delete(scheduleId); return n })
+          // data.result may be a string or a metadata object — extract displayable text safely
+          const resultText = typeof data.result === 'string'
+            ? data.result
+            : data.result?.response ?? data.result?.output ?? 'Task completed successfully'
           setTaskResults(prev => ({
             ...prev,
-            [scheduleId]: { scheduleId, status: 'success', result: data.result ?? 'Task completed' },
+            [scheduleId]: { scheduleId, status: 'success', result: resultText },
           }))
         } else if (status === 'failure') {
           clearInterval(interval)
           setRunning(prev => { const n = new Set(prev); n.delete(scheduleId); return n })
+          const resultText = typeof data.result === 'string'
+            ? data.result
+            : 'Task failed'
           setTaskResults(prev => ({
             ...prev,
-            [scheduleId]: { scheduleId, status: 'failure', result: data.result ?? 'Task failed' },
+            [scheduleId]: { scheduleId, status: 'failure', result: resultText },
           }))
         }
         // status === 'pending' → do nothing, interval fires again in 2s
@@ -275,11 +256,11 @@ export default function SchedulesPage() {
     }, 2000)
   }
 
-  // ── Derived values ─────────────────────────────────────────────────────────
-  const plan      = user?.plan ?? 'free'
-  const limit     = PLAN_LIMITS[plan] ?? 0
-  const isFree    = plan === 'free'
-  const atLimit   = schedules.length >= limit && !isFree
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const plan    = user?.plan ?? 'free'
+  const limit   = PLAN_LIMITS[plan] ?? 0
+  const isFree  = plan === 'free'
+  const atLimit = schedules.length >= limit && !isFree
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -296,15 +277,13 @@ export default function SchedulesPage() {
         <Link href="/dashboard" style={{
           fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.03em',
           padding: '0.5rem 0.75rem', display: 'block', marginBottom: '1.25rem',
-          color: 'var(--text)',
+          color: 'var(--text)', textDecoration: 'none',
         }}>
           Nexora
         </Link>
+        <NavItem href="/dashboard" label="🤖  Agents"   active={false} />
+        <NavItem href="/schedules" label="⏰  Schedules" active={true}  />
 
-        <NavItem href="/dashboard"  label="🤖  Agents"    active={false} />
-        <NavItem href="/schedules"  label="⏰  Schedules"  active={true} />
-
-        {/* Bottom: user info + logout — matches dashboard sidebar */}
         <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
           <div style={{ padding: '0.5rem 0.75rem' }}>
             <div style={{
@@ -316,12 +295,10 @@ export default function SchedulesPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span style={{
-                width: '6px', height: '6px', borderRadius: '50%',
+                width: 6, height: 6, borderRadius: '50%',
                 background: PLAN_COLORS[plan], display: 'inline-block',
               }} />
-              <span style={{
-                fontSize: '0.75rem', color: 'var(--text-2)', textTransform: 'capitalize',
-              }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-2)', textTransform: 'capitalize' }}>
                 {plan} plan
               </span>
             </div>
@@ -330,8 +307,9 @@ export default function SchedulesPage() {
             onClick={logout}
             style={{
               width: '100%', textAlign: 'left', padding: '0.5rem 0.75rem',
-              background: 'transparent', border: 'none', color: 'var(--text-3)',
-              fontSize: '0.85rem', cursor: 'pointer', borderRadius: '6px',
+              background: 'transparent', border: 'none',
+              color: 'var(--text-3)', fontSize: '0.85rem',
+              cursor: 'pointer', borderRadius: 6,
             }}
           >
             Sign out
@@ -358,7 +336,6 @@ export default function SchedulesPage() {
               Automated tasks that run your agents on a timer
             </p>
 
-            {/* Plan usage bar — free shows upgrade, paid shows X / Y */}
             {!loading && (
               isFree ? (
                 <div style={{
@@ -378,10 +355,7 @@ export default function SchedulesPage() {
                   background: 'var(--bg-3)', border: '1px solid var(--border)',
                   borderRadius: 8, padding: '6px 12px',
                 }}>
-                  <span style={{
-                    fontSize: 12, fontWeight: 600,
-                    color: atLimit ? 'var(--red)' : 'var(--green)',
-                  }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: atLimit ? 'var(--red)' : 'var(--green)' }}>
                     {schedules.length} / {limit}
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>schedules used</span>
@@ -399,7 +373,6 @@ export default function SchedulesPage() {
             )}
           </div>
 
-          {/* Hide create button for free plan or when at limit */}
           {!isFree && !atLimit && (
             <button
               onClick={() => { setShowForm(f => !f); setError('') }}
@@ -440,15 +413,11 @@ export default function SchedulesPage() {
               New schedule
             </h2>
 
-            {/* Row 1: Name + Agent */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div>
                 <label style={labelStyle}>Schedule name</label>
-                <input
-                  name="name" value={form.name} onChange={handleChange}
-                  placeholder="Daily market summary"
-                  style={inputStyle}
-                />
+                <input name="name" value={form.name} onChange={handleChange}
+                  placeholder="Daily market summary" style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Agent</label>
@@ -460,28 +429,21 @@ export default function SchedulesPage() {
               </div>
             </div>
 
-            {/* Row 2: Friendly schedule builder — hides complexity of cron syntax */}
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>When should this run?</label>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-
-                <select
-                  name="repeat" value={form.repeat} onChange={handleChange}
-                  style={{ ...inputStyle, width: 'auto', flex: '1 1 140px' }}
-                >
+                <select name="repeat" value={form.repeat} onChange={handleChange}
+                  style={{ ...inputStyle, width: 'auto', flex: '1 1 140px' }}>
                   {REPEAT_OPTIONS.map(o => (
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </select>
 
-                {/* Day selector — only shown for weekly repeat */}
                 {form.repeat === 'weekly' && (
                   <>
                     <span style={{ color: 'var(--text-3)', fontSize: 13 }}>on</span>
-                    <select
-                      name="day" value={form.day} onChange={handleChange}
-                      style={{ ...inputStyle, width: 'auto', flex: '1 1 130px' }}
-                    >
+                    <select name="day" value={form.day} onChange={handleChange}
+                      style={{ ...inputStyle, width: 'auto', flex: '1 1 130px' }}>
                       {DAY_OPTIONS.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
@@ -489,14 +451,11 @@ export default function SchedulesPage() {
                   </>
                 )}
 
-                {/* Time — hidden for hourly (fires every hour, no time needed) */}
                 {form.repeat !== 'hourly' && (
                   <>
                     <span style={{ color: 'var(--text-3)', fontSize: 13 }}>at</span>
-                    <select
-                      name="hour" value={form.hour} onChange={handleChange}
-                      style={{ ...inputStyle, width: 'auto', flex: '1 1 130px' }}
-                    >
+                    <select name="hour" value={form.hour} onChange={handleChange}
+                      style={{ ...inputStyle, width: 'auto', flex: '1 1 130px' }}>
                       {TIME_OPTIONS.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
@@ -504,7 +463,6 @@ export default function SchedulesPage() {
                   </>
                 )}
 
-                {/* Read-only cron preview — shows the raw expression for learning */}
                 <span style={{
                   padding: '8px 12px', borderRadius: 6,
                   background: 'var(--bg-3)', border: '1px solid var(--border)',
@@ -516,30 +474,21 @@ export default function SchedulesPage() {
               </div>
             </div>
 
-            {/* Row 3: Prompt */}
             <div style={{ marginBottom: 20 }}>
               <label style={labelStyle}>What should the agent do each run?</label>
-              <textarea
-                name="prompt" value={form.prompt} onChange={handleChange}
+              <textarea name="prompt" value={form.prompt} onChange={handleChange}
                 placeholder="Summarize the top 5 technology news stories from today"
                 rows={3}
-                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
-              />
+                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                onClick={handleCreate}
-                disabled={submitting}
-                style={{
-                  padding: '10px 24px', borderRadius: 8,
-                  background: submitting ? 'var(--bg-3)' : 'var(--accent)',
-                  border: 'none',
-                  color: submitting ? 'var(--text-2)' : 'white',
-                  fontSize: 14, fontWeight: 600,
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                }}
-              >
+              <button onClick={handleCreate} disabled={submitting} style={{
+                padding: '10px 24px', borderRadius: 8,
+                background: submitting ? 'var(--bg-3)' : 'var(--accent)',
+                border: 'none', color: submitting ? 'var(--text-2)' : 'white',
+                fontSize: 14, fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer',
+              }}>
                 {submitting ? 'Creating...' : 'Create schedule'}
               </button>
             </div>
@@ -554,13 +503,10 @@ export default function SchedulesPage() {
         ) : schedules.length === 0 ? (
           <div style={{
             textAlign: 'center', padding: '60px 20px',
-            background: 'var(--bg-2)', border: '1px solid var(--border)',
-            borderRadius: 12,
+            background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 12,
           }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>⏰</div>
-            <div style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 8 }}>
-              No schedules yet
-            </div>
+            <div style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 8 }}>No schedules yet</div>
             <div style={{ color: 'var(--text-2)', fontSize: 14 }}>
               {isFree
                 ? 'Upgrade to Starter ($19/mo) to start automating your agents.'
@@ -572,22 +518,17 @@ export default function SchedulesPage() {
             {schedules.map(schedule => (
               <div key={schedule.id}>
 
-                {/* Schedule card */}
                 <div style={{
                   background: 'var(--bg-2)', border: '1px solid var(--border)',
                   borderRadius: taskResults[schedule.id] ? '12px 12px 0 0' : 12,
                   padding: '18px 20px',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-
-                    {/* Left: info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                         <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>
                           {schedule.name}
                         </span>
-
-                        {/* Active / Paused badge */}
                         <span style={{
                           padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600,
                           background: schedule.is_active ? 'rgba(52,211,153,0.12)' : 'var(--bg-3)',
@@ -597,14 +538,10 @@ export default function SchedulesPage() {
                           {schedule.is_active ? 'Active' : 'Paused'}
                         </span>
                       </div>
-
-                      {/* Meta row — human label, not raw cron */}
                       <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-2)' }}>
                         <span>🕐 {cronToLabel(schedule.cron)}</span>
                         <span>🤖 {schedule.agent_name}</span>
                       </div>
-
-                      {/* Prompt preview */}
                       <div style={{
                         marginTop: 8, fontSize: 13, color: 'var(--text-3)',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -614,10 +551,7 @@ export default function SchedulesPage() {
                       </div>
                     </div>
 
-                    {/* Right: action buttons */}
                     <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-
-                      {/* Run now — triggers Celery task, then polls for completion */}
                       <button
                         onClick={() => handleRun(schedule.id)}
                         disabled={running.has(schedule.id)}
@@ -632,11 +566,10 @@ export default function SchedulesPage() {
                         {running.has(schedule.id) ? '⏳' : '▶ Run'}
                       </button>
 
-                      {/* Pause / Resume toggle — like a play/pause button */}
                       <button
                         onClick={() => handleToggle(schedule)}
                         disabled={toggling.has(schedule.id)}
-                        title={schedule.is_active ? 'Pause this schedule' : 'Resume this schedule'}
+                        title={schedule.is_active ? 'Pause' : 'Resume'}
                         style={{
                           padding: '6px 10px', borderRadius: 8,
                           background: 'var(--bg-3)', border: '1px solid var(--border)',
@@ -647,10 +580,8 @@ export default function SchedulesPage() {
                         {toggling.has(schedule.id) ? '·' : schedule.is_active ? '⏸' : '▶'}
                       </button>
 
-                      {/* Delete */}
                       <button
                         onClick={() => handleDelete(schedule.id)}
-                        title="Delete schedule"
                         style={{
                           padding: '6px 10px', borderRadius: 8,
                           background: 'transparent', border: '1px solid var(--border)',
@@ -663,11 +594,10 @@ export default function SchedulesPage() {
                   </div>
                 </div>
 
-                {/* Task result panel — attaches below the card when a run is in progress or done */}
+                {/* Task result panel */}
                 {taskResults[schedule.id] && (
                   <div style={{
-                    padding: '12px 20px',
-                    borderRadius: '0 0 12px 12px',
+                    padding: '12px 20px', borderRadius: '0 0 12px 12px',
                     background:
                       taskResults[schedule.id].status === 'success' ? 'rgba(52,211,153,0.08)'
                       : taskResults[schedule.id].status === 'failure' ? 'rgba(248,113,113,0.08)'
@@ -676,22 +606,16 @@ export default function SchedulesPage() {
                       taskResults[schedule.id].status === 'success' ? 'rgba(52,211,153,0.3)'
                       : taskResults[schedule.id].status === 'failure' ? 'rgba(248,113,113,0.3)'
                       : 'var(--border)'}`,
-                    borderTop: 'none',
-                    fontSize: 13,
+                    borderTop: 'none', fontSize: 13,
                     color:
                       taskResults[schedule.id].status === 'success' ? 'var(--green)'
                       : taskResults[schedule.id].status === 'failure' ? 'var(--red)'
                       : 'var(--text-2)',
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6,
                   }}>
-                    {taskResults[schedule.id].status === 'pending' && (
-                      <span>⏳ Running... checking every 2s</span>
-                    )}
-                    {taskResults[schedule.id].status === 'success' && (
-                      <span>✓ {taskResults[schedule.id].result}</span>
-                    )}
-                    {taskResults[schedule.id].status === 'failure' && (
-                      <span>✗ {taskResults[schedule.id].result}</span>
-                    )}
+                    {taskResults[schedule.id].status === 'pending' && <span>⏳ Running... checking every 2s</span>}
+                    {taskResults[schedule.id].status === 'success' && <span>✓ {taskResults[schedule.id].result}</span>}
+                    {taskResults[schedule.id].status === 'failure' && <span>✗ {taskResults[schedule.id].result}</span>}
                   </div>
                 )}
 
@@ -721,12 +645,12 @@ const inputStyle: React.CSSProperties = {
 function NavItem({ href, label, active }: { href: string; label: string; active: boolean }) {
   return (
     <Link href={href} style={{
-      display: 'block', padding: '0.5rem 0.75rem', borderRadius: '7px',
+      display: 'block', padding: '0.5rem 0.75rem', borderRadius: 7,
       fontSize: '0.875rem', fontWeight: active ? 600 : 400,
       background: active ? 'var(--accent-g)' : 'transparent',
       color: active ? 'var(--text)' : 'var(--text-2)',
       border: active ? '1px solid rgba(108,99,255,0.2)' : '1px solid transparent',
-      marginBottom: '0.1rem',
+      marginBottom: '0.1rem', textDecoration: 'none',
     }}>
       {label}
     </Link>
