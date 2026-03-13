@@ -1,5 +1,8 @@
 'use client'
 // app/agents/[id]/page.tsx
+// Stage 13 bug fix applied: use(params) for Next.js 16
+// Stage 14 fix: agent_config (not agent.config) — matches actual backend field name
+
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -8,7 +11,17 @@ import { api, getToken } from '@/lib/api'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 interface Message { role: 'user' | 'assistant'; content: string }
-interface Agent { id: number; name: string; config: { agent_type?: string; welcome_message?: string } }
+
+// FIX: field is agent_config not config — matches GET /agents/{id} response shape
+interface Agent {
+  id: number
+  name: string
+  agent_type: string
+  agent_config: {
+    agent_type?: string
+    welcome_message?: string
+  }
+}
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -108,20 +121,27 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         <Link href="/dashboard" style={{ color: 'var(--text-3)', fontSize: '1.1rem' }}>←</Link>
         <div>
           <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{agent?.name || '...'}</div>
+          {/* FIX: was agent?.config?.agent_type — now agent?.agent_type (top-level field) */}
           <div style={{ color: 'var(--text-3)', fontSize: '0.75rem', fontFamily: 'JetBrains Mono, monospace', textTransform: 'capitalize' }}>
-            {agent?.config?.agent_type?.replace(/_/g, ' ') || ''}
+            {agent?.agent_type?.replace(/_/g, ' ') || ''}
           </div>
         </div>
         {agent && (
-          <Link href={`/agents/${id}/edit`} style={{ marginLeft: 'auto', color: 'var(--text-3)', border: '1px solid var(--border)', padding: '0.3rem 0.7rem', borderRadius: '6px', fontSize: '0.8rem' }}>Edit</Link>
+          <Link
+            href={`/agents/${id}/edit`}
+            style={{ marginLeft: 'auto', color: 'var(--text-3)', border: '1px solid var(--border)', padding: '0.3rem 0.7rem', borderRadius: '6px', fontSize: '0.8rem' }}
+          >
+            Edit
+          </Link>
         )}
       </div>
 
       {/* messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '900px', width: '100%', margin: '0 auto', alignSelf: 'center' }}>
         {messages.length === 0 && agent && (
           <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '3rem 1rem', fontSize: '0.9rem' }}>
-            {agent.config?.welcome_message || `Hi! I'm ${agent.name}. How can I help?`}
+            {/* FIX: was agent.config?.welcome_message — now agent.agent_config?.welcome_message */}
+            {agent.agent_config?.welcome_message || `Hi! I'm ${agent.name}. How can I help?`}
           </div>
         )}
         {messages.map((msg, i) => (
@@ -144,7 +164,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       </div>
 
       {/* input */}
-      <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', gap: '0.75rem' }}>
+      <div style={{ padding: '1rem 2rem', borderTop: '1px solid var(--border)', background: 'var(--bg-2)', display: 'flex', gap: '0.75rem', maxWidth: '900px', width: '100%', margin: '0 auto', alignSelf: 'center' }}>
         <textarea
           value={input}
           onChange={e => setInput(e.target.value)}
