@@ -612,7 +612,7 @@ export default function SchedulesPage() {
                     <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Starter ($19/mo)</span>
                     {' '}or higher
                   </span>
-                  <Link href="/" style={{ color: 'var(--text)', fontWeight: 700, textDecoration: 'underline', fontSize: 13 }}>
+                  <Link href="/upgrade" style={{ color: 'var(--text)', fontWeight: 700, textDecoration: 'underline', fontSize: 13 }}>
                     Upgrade
                   </Link>
                 </div>
@@ -776,7 +776,7 @@ export default function SchedulesPage() {
             <div style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 8 }}>No schedules yet</div>
             <div style={{ color: 'var(--text-2)', fontSize: 14 }}>
               {isFree
-                ? <span>Upgrade to Starter ($19/mo) to start automating your agents. <Link href="/" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'underline' }}>View plans</Link></span>
+                ? <span>Upgrade to Starter ($19/mo) to start automating your agents. <Link href="/upgrade" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'underline' }}>View plans</Link></span>
                 : 'Create a schedule to run your agents automatically.'}
             </div>
           </div>

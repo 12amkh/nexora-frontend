@@ -95,7 +95,7 @@ export default function NewAgentPage() {
           <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: '8px', padding: '0.75rem 1rem', color: 'var(--red)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
             <div>{error}</div>
             {showUpgrade && (
-              <Link href="/" style={{ display: 'inline-block', marginTop: '0.55rem', color: 'var(--text)', fontWeight: 700, textDecoration: 'underline' }}>
+              <Link href="/upgrade" style={{ display: 'inline-block', marginTop: '0.55rem', color: 'var(--text)', fontWeight: 700, textDecoration: 'underline' }}>
                 Upgrade to create more agents
               </Link>
             )}

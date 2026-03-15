@@ -194,7 +194,7 @@ export default function UsageStats() {
         >
           You're approaching your plan limits. Upgrade to continue using Nexora without restrictions.
           <Link
-            href="/"
+            href="/upgrade"
             style={{
               marginLeft: 8,
               color: "var(--text)",
