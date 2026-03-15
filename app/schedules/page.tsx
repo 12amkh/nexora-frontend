@@ -3,7 +3,7 @@
 // app/schedules/page.tsx
 // Stage 15: Schedules page — list, create, pause/resume, manual trigger with live polling
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { api, getUser, logout, getErrorMessage } from '@/lib/api'
@@ -17,6 +17,8 @@ interface Schedule {
   task_message: string
   is_active: boolean
   agent_id: number
+  last_run_at?: string | null
+  last_run_status?: string | null
   agent_name?: string
 }
 
@@ -27,9 +29,12 @@ interface Agent {
 
 interface TaskResult {
   scheduleId: number
-  status: 'pending' | 'success' | 'failure'
+  status: 'pending' | 'started' | 'retry' | 'success' | 'failure'
   result?: string
 }
+
+type PendingTaskMap = Record<string, string>
+type CachedTaskResultMap = Record<string, { status: TaskResult['status']; result?: string }>
 
 const PLAN_LIMITS: Record<string, number> = {
   free: 0, starter: 3, pro: 10, business: 50,
@@ -38,6 +43,9 @@ const PLAN_LIMITS: Record<string, number> = {
 const PLAN_COLORS: Record<string, string> = {
   free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b',
 }
+
+const PENDING_TASKS_STORAGE_KEY = 'nexora_pending_schedule_tasks'
+const TASK_RESULTS_STORAGE_KEY = 'nexora_schedule_task_results'
 
 // ─── Friendly cron builder ────────────────────────────────────────────────────
 
@@ -85,10 +93,63 @@ const cronToLabel = (cron: string): string => {
   return `Every day at ${hour}`
 }
 
+const getTaskTone = (status: TaskResult['status']) => {
+  if (status === 'success') {
+    return {
+      bg: 'rgba(52,211,153,0.08)',
+      border: 'rgba(52,211,153,0.3)',
+      text: 'var(--green)',
+      label: 'Last run completed',
+      icon: '✓',
+    }
+  }
+  if (status === 'failure') {
+    return {
+      bg: 'rgba(248,113,113,0.08)',
+      border: 'rgba(248,113,113,0.3)',
+      text: 'var(--red)',
+      label: 'Last run failed',
+      icon: '✗',
+    }
+  }
+  if (status === 'retry') {
+    return {
+      bg: 'rgba(251,191,36,0.08)',
+      border: 'rgba(251,191,36,0.3)',
+      text: '#fbbf24',
+      label: 'Retrying run',
+      icon: '🔁',
+    }
+  }
+  return {
+    bg: 'var(--bg-3)',
+    border: 'var(--border)',
+    text: 'var(--text-2)',
+    label: status === 'started' ? 'Worker is running' : 'Waiting in queue',
+    icon: status === 'started' ? '⚙️' : '⏳',
+  }
+}
+
+const formatRunTime = (isoDate?: string | null) => {
+  if (!isoDate) return null
+
+  const date = new Date(isoDate)
+  if (Number.isNaN(date.getTime())) return null
+
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SchedulesPage() {
   const router = useRouter()
+  const pollIntervals = useRef<Record<number, ReturnType<typeof setInterval>>>({})
+  const restoredTasks = useRef(false)
 
   const [schedules, setSchedules]   = useState<Schedule[]>([])
   const [agents, setAgents]         = useState<Agent[]>([])
@@ -112,10 +173,123 @@ export default function SchedulesPage() {
     if (!localStorage.getItem('token')) { router.push('/login'); return }
     const u = getUser()
     setUser(u)
-    loadData()
+    loadData(true)
+
+    return () => {
+      Object.values(pollIntervals.current).forEach(clearInterval)
+      pollIntervals.current = {}
+    }
   }, [])
 
-  const loadData = async () => {
+  const getPendingTasks = (): PendingTaskMap => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const raw = localStorage.getItem(PENDING_TASKS_STORAGE_KEY)
+      return raw ? JSON.parse(raw) as PendingTaskMap : {}
+    } catch {
+      return {}
+    }
+  }
+
+  const setPendingTasks = (tasks: PendingTaskMap) => {
+    if (typeof window === 'undefined') return
+    if (Object.keys(tasks).length === 0) {
+      localStorage.removeItem(PENDING_TASKS_STORAGE_KEY)
+      return
+    }
+    localStorage.setItem(PENDING_TASKS_STORAGE_KEY, JSON.stringify(tasks))
+  }
+
+  const rememberTask = (scheduleId: number, taskId: string) => {
+    const tasks = getPendingTasks()
+    tasks[String(scheduleId)] = taskId
+    setPendingTasks(tasks)
+  }
+
+  const forgetTask = (scheduleId: number) => {
+    const tasks = getPendingTasks()
+    delete tasks[String(scheduleId)]
+    setPendingTasks(tasks)
+  }
+
+  const getCachedResults = (): CachedTaskResultMap => {
+    if (typeof window === 'undefined') return {}
+    try {
+      const raw = localStorage.getItem(TASK_RESULTS_STORAGE_KEY)
+      return raw ? JSON.parse(raw) as CachedTaskResultMap : {}
+    } catch {
+      return {}
+    }
+  }
+
+  const setCachedResults = (results: CachedTaskResultMap) => {
+    if (typeof window === 'undefined') return
+    if (Object.keys(results).length === 0) {
+      localStorage.removeItem(TASK_RESULTS_STORAGE_KEY)
+      return
+    }
+    localStorage.setItem(TASK_RESULTS_STORAGE_KEY, JSON.stringify(results))
+  }
+
+  const rememberResult = (scheduleId: number, status: TaskResult['status'], result?: string) => {
+    const results = getCachedResults()
+    results[String(scheduleId)] = { status, result }
+    setCachedResults(results)
+  }
+
+  const forgetResult = (scheduleId: number) => {
+    const results = getCachedResults()
+    delete results[String(scheduleId)]
+    setCachedResults(results)
+  }
+
+  const restorePendingTasks = (scheduleList: Schedule[]) => {
+    if (restoredTasks.current) return
+    restoredTasks.current = true
+
+    const pendingTasks = getPendingTasks()
+    const scheduleIds = new Set(scheduleList.map((schedule) => String(schedule.id)))
+
+    Object.entries(pendingTasks).forEach(([scheduleId, taskId]) => {
+      if (!scheduleIds.has(scheduleId)) {
+        forgetTask(Number(scheduleId))
+        return
+      }
+
+      const id = Number(scheduleId)
+      setRunning(prev => new Set(prev).add(id))
+      setTaskResults(prev => ({
+        ...prev,
+        [id]: { scheduleId: id, status: 'pending', result: 'Restored after reload. Checking task status...' },
+      }))
+      pollTask(id, taskId)
+    })
+  }
+
+  const restoreCachedResults = (scheduleList: Schedule[]) => {
+    const cachedResults = getCachedResults()
+
+    setTaskResults(prev => {
+      const next = { ...prev }
+
+      scheduleList.forEach((schedule) => {
+        if (next[schedule.id]) return
+
+        const cached = cachedResults[String(schedule.id)]
+        if (!cached) return
+
+        next[schedule.id] = {
+          scheduleId: schedule.id,
+          status: cached.status,
+          result: cached.result,
+        }
+      })
+
+      return next
+    })
+  }
+
+  const loadData = async (restoreTasks = false) => {
     setLoading(true)
     try {
       const [schedRes, agentRes] = await Promise.all([
@@ -130,6 +304,10 @@ export default function SchedulesPage() {
         agent_name: agentMap[s.agent_id] ?? 'Unknown agent',
       }))
       setSchedules(enriched)
+      restoreCachedResults(enriched)
+      if (restoreTasks) {
+        restorePendingTasks(enriched)
+      }
       if (agentList.length > 0) {
         setForm(prev => ({ ...prev, agent_id: String(agentList[0].id) }))
       }
@@ -194,7 +372,14 @@ export default function SchedulesPage() {
     if (!confirm('Delete this schedule?')) return
     try {
       await api.delete(`/schedules/${id}`)
+      if (pollIntervals.current[id]) {
+        clearInterval(pollIntervals.current[id])
+        delete pollIntervals.current[id]
+      }
+      forgetTask(id)
+      forgetResult(id)
       setSchedules(prev => prev.filter(s => s.id !== id))
+      setRunning(prev => { const n = new Set(prev); n.delete(id); return n })
       setTaskResults(prev => { const n = { ...prev }; delete n[id]; return n })
     } catch (err) {
       setError(getErrorMessage(err))
@@ -204,11 +389,13 @@ export default function SchedulesPage() {
   // ── Manual trigger + polling ───────────────────────────────────────────────
   const handleRun = async (scheduleId: number) => {
     setRunning(prev => new Set(prev).add(scheduleId))
-    setTaskResults(prev => ({ ...prev, [scheduleId]: { scheduleId, status: 'pending' } }))
+    setTaskResults(prev => ({ ...prev, [scheduleId]: { scheduleId, status: 'pending', result: 'Queued. Checking task status...' } }))
     try {
       const { data } = await api.post(`/schedules/${scheduleId}/run`)
+      rememberTask(scheduleId, data.task_id)
       pollTask(scheduleId, data.task_id)
     } catch (err) {
+      forgetTask(scheduleId)
       setRunning(prev => { const n = new Set(prev); n.delete(scheduleId); return n })
       setTaskResults(prev => ({
         ...prev,
@@ -220,7 +407,14 @@ export default function SchedulesPage() {
   // FIX: single clean if/else block — all branches inside the setInterval callback
   // Previous version had a stray closing brace that kicked the else-if outside the callback
   const pollTask = (scheduleId: number, taskId: string) => {
+    if (pollIntervals.current[scheduleId]) return
+
+    let attempts = 0
+    const MAX_ATTEMPTS = 30 // ~60 seconds at 2s intervals
+
     const interval = setInterval(async () => {
+      attempts += 1
+
       try {
         const { data } = await api.get(`/schedules/task/${taskId}`)
         // Normalize to lowercase — Celery returns "SUCCESS"/"FAILURE" uppercase
@@ -228,6 +422,8 @@ export default function SchedulesPage() {
 
         if (status === 'success') {
           clearInterval(interval)
+          delete pollIntervals.current[scheduleId]
+          forgetTask(scheduleId)
           setRunning(prev => { const n = new Set(prev); n.delete(scheduleId); return n })
           // data.result may be a string or a metadata object — extract displayable text safely
           const resultText = typeof data.result === 'string'
@@ -237,8 +433,26 @@ export default function SchedulesPage() {
             ...prev,
             [scheduleId]: { scheduleId, status: 'success', result: resultText },
           }))
+          rememberResult(scheduleId, 'success', resultText)
+          setSchedules(prev => prev.map(schedule =>
+            schedule.id === scheduleId
+              ? { ...schedule, last_run_status: 'success', last_run_at: new Date().toISOString() }
+              : schedule
+          ))
+        } else if (status === 'started') {
+          setTaskResults(prev => ({
+            ...prev,
+            [scheduleId]: { scheduleId, status: 'started', result: 'Task is running on the worker...' },
+          }))
+        } else if (status === 'retry') {
+          setTaskResults(prev => ({
+            ...prev,
+            [scheduleId]: { scheduleId, status: 'retry', result: 'Task hit an error and is being retried...' },
+          }))
         } else if (status === 'failure') {
           clearInterval(interval)
+          delete pollIntervals.current[scheduleId]
+          forgetTask(scheduleId)
           setRunning(prev => { const n = new Set(prev); n.delete(scheduleId); return n })
           const resultText = typeof data.result === 'string'
             ? data.result
@@ -247,13 +461,46 @@ export default function SchedulesPage() {
             ...prev,
             [scheduleId]: { scheduleId, status: 'failure', result: resultText },
           }))
+          rememberResult(scheduleId, 'failure', resultText)
+          setSchedules(prev => prev.map(schedule =>
+            schedule.id === scheduleId
+              ? { ...schedule, last_run_status: 'failed', last_run_at: new Date().toISOString() }
+              : schedule
+          ))
+        } else if (attempts >= MAX_ATTEMPTS) {
+          clearInterval(interval)
+          delete pollIntervals.current[scheduleId]
+          forgetTask(scheduleId)
+          setRunning(prev => { const n = new Set(prev); n.delete(scheduleId); return n })
+          setTaskResults(prev => ({
+            ...prev,
+            [scheduleId]: {
+              scheduleId,
+              status: 'failure',
+              result: 'Task is still queued after 60 seconds. Your Celery worker may not be running.',
+            },
+          }))
+          rememberResult(scheduleId, 'failure', 'Task is still queued after 60 seconds. Your Celery worker may not be running.')
         }
-        // status === 'pending' → do nothing, interval fires again in 2s
+        // status === 'pending' → keep polling until success/failure/timeout
       } catch {
         clearInterval(interval)
+        delete pollIntervals.current[scheduleId]
+        forgetTask(scheduleId)
         setRunning(prev => { const n = new Set(prev); n.delete(scheduleId); return n })
+        setTaskResults(prev => ({
+          ...prev,
+          [scheduleId]: {
+            scheduleId,
+            status: 'failure',
+            result: 'Failed to check task status. Please try again.',
+          },
+        }))
+        rememberResult(scheduleId, 'failure', 'Failed to check task status. Please try again.')
       }
     }, 2000)
+
+    pollIntervals.current[scheduleId] = interval
   }
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -542,6 +789,18 @@ export default function SchedulesPage() {
                         <span>🕐 {cronToLabel(schedule.cron)}</span>
                         <span>🤖 {schedule.agent_name}</span>
                       </div>
+                      {(schedule.last_run_at || schedule.last_run_status) && (
+                        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
+                          {schedule.last_run_at && (
+                            <span>Last run: {formatRunTime(schedule.last_run_at)}</span>
+                          )}
+                          {schedule.last_run_status && (
+                            <span style={{ textTransform: 'capitalize' }}>
+                              Status: {schedule.last_run_status}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <div style={{
                         marginTop: 8, fontSize: 13, color: 'var(--text-3)',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -595,29 +854,61 @@ export default function SchedulesPage() {
                 </div>
 
                 {/* Task result panel */}
-                {taskResults[schedule.id] && (
-                  <div style={{
-                    padding: '12px 20px', borderRadius: '0 0 12px 12px',
-                    background:
-                      taskResults[schedule.id].status === 'success' ? 'rgba(52,211,153,0.08)'
-                      : taskResults[schedule.id].status === 'failure' ? 'rgba(248,113,113,0.08)'
-                      : 'var(--bg-3)',
-                    border: `1px solid ${
-                      taskResults[schedule.id].status === 'success' ? 'rgba(52,211,153,0.3)'
-                      : taskResults[schedule.id].status === 'failure' ? 'rgba(248,113,113,0.3)'
-                      : 'var(--border)'}`,
-                    borderTop: 'none', fontSize: 13,
-                    color:
-                      taskResults[schedule.id].status === 'success' ? 'var(--green)'
-                      : taskResults[schedule.id].status === 'failure' ? 'var(--red)'
-                      : 'var(--text-2)',
-                    whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6,
-                  }}>
-                    {taskResults[schedule.id].status === 'pending' && <span>⏳ Running... checking every 2s</span>}
-                    {taskResults[schedule.id].status === 'success' && <span>✓ {taskResults[schedule.id].result}</span>}
-                    {taskResults[schedule.id].status === 'failure' && <span>✗ {taskResults[schedule.id].result}</span>}
-                  </div>
-                )}
+                {taskResults[schedule.id] && (() => {
+                  const taskResult = taskResults[schedule.id]
+                  const tone = getTaskTone(taskResult.status)
+
+                  return (
+                    <div style={{
+                      padding: '14px 20px 16px',
+                      borderRadius: '0 0 12px 12px',
+                      background: tone.bg,
+                      border: `1px solid ${tone.border}`,
+                      borderTop: 'none',
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        marginBottom: taskResult.result ? 10 : 0,
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: tone.text,
+                        }}>
+                          <span>{tone.icon}</span>
+                          <span>{tone.label}</span>
+                        </div>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                          polled every 2s
+                        </span>
+                      </div>
+
+                      {taskResult.result && (
+                        <div style={{
+                          background: 'rgba(5,5,7,0.28)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 10,
+                          padding: '12px 14px',
+                          color: taskResult.status === 'success' ? 'var(--text)' : tone.text,
+                          fontSize: 13,
+                          lineHeight: 1.7,
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          maxHeight: 260,
+                          overflowY: 'auto',
+                        }}>
+                          {taskResult.result}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
               </div>
             ))}

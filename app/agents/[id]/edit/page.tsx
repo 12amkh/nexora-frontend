@@ -71,25 +71,25 @@ export default function EditAgentPage({
         const agent = res.data;
 
         // focus_topics and avoid_topics come as arrays from the backend — join for textarea
-        const focusArr: string[] = agent.agent_config?.focus_topics ?? [];
-        const avoidArr: string[] = agent.agent_config?.avoid_topics ?? [];
+        const focusArr: string[] = agent.config?.focus_topics ?? [];
+        const avoidArr: string[] = agent.config?.avoid_topics ?? [];
 
-        setAgentType(agent.agent_type ?? "");
+        setAgentType(agent.config?.agent_type ?? "");
 
         // Populate the form with all existing values
         setForm({
           name: agent.name ?? "",
           description: agent.description ?? "",
-          tone: agent.agent_config?.tone ?? "professional",
-          response_length: agent.agent_config?.response_length ?? "medium",
-          language: agent.agent_config?.language ?? "English",
-          use_web_search: agent.agent_config?.use_web_search ?? true,
-          instructions: agent.agent_config?.instructions ?? "",
-          welcome_message: agent.agent_config?.welcome_message ?? "",
+          tone: agent.config?.tone ?? "professional",
+          response_length: agent.config?.response_length ?? "medium",
+          language: agent.config?.language ?? "english",
+          use_web_search: agent.config?.use_web_search ?? true,
+          instructions: agent.config?.instructions ?? "",
+          welcome_message: agent.config?.welcome_message ?? "",
           focus_topics: focusArr.join(", "),
           avoid_topics: avoidArr.join(", "),
-          custom_knowledge: agent.agent_config?.custom_knowledge ?? "",
-          max_history: agent.agent_config?.max_history ?? 20,
+          custom_knowledge: agent.config?.custom_knowledge ?? "",
+          max_history: agent.config?.max_history ?? 20,
         });
       } catch (err: unknown) {
         const message =
@@ -141,8 +141,7 @@ export default function EditAgentPage({
       await api.put(`/agents/${id}`, {
         name: form.name,
         description: form.description,
-        // Nest config fields under agent_config so the backend knows where they go
-        agent_config: {
+        config: {
           tone: form.tone,
           response_length: form.response_length,
           language: form.language,

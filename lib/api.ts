@@ -9,6 +9,10 @@ export const api = axios.create({
 
 // Attach JWT token to every request automatically
 api.interceptors.request.use((config) => {
+  if (typeof window === 'undefined') {
+    return config
+  }
+
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -20,7 +24,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    if (typeof window !== 'undefined' && err.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       window.location.href = '/login'
@@ -29,14 +33,19 @@ api.interceptors.response.use(
   }
 )
 
-export const getToken = () => localStorage.getItem('token')
+export const getToken = () => {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem('token')
+}
 
 export const getUser = () => {
+  if (typeof window === 'undefined') return null
   const u = localStorage.getItem('user')
   return u ? JSON.parse(u) : null
 }
 
 export const logout = () => {
+  if (typeof window === 'undefined') return
   localStorage.removeItem('token')
   localStorage.removeItem('user')
   window.location.href = '/login'
