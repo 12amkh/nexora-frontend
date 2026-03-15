@@ -36,8 +36,8 @@ interface TaskResult {
 type PendingTaskMap = Record<string, string>
 type CachedTaskResultMap = Record<string, { status: TaskResult['status']; result?: string }>
 
-const PLAN_LIMITS: Record<string, number> = {
-  free: 0, starter: 3, pro: 10, business: 50,
+const PLAN_LIMITS: Record<string, number | null> = {
+  free: 0, starter: 3, pro: 10, business: 50, enterprise: null,
 }
 
 const PLAN_COLORS: Record<string, string> = {
@@ -524,7 +524,7 @@ export default function SchedulesPage() {
   const plan    = normalizePlan(user?.plan)
   const limit   = PLAN_LIMITS[plan] ?? 0
   const isFree  = plan === 'free'
-  const atLimit = schedules.length >= limit && !isFree
+  const atLimit = limit !== null && schedules.length >= limit && !isFree
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -620,7 +620,7 @@ export default function SchedulesPage() {
                   borderRadius: 8, padding: '6px 12px',
                 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: atLimit ? 'var(--red)' : 'var(--green)' }}>
-                    {schedules.length} / {limit}
+                    {limit === null ? `${schedules.length} / Unlimited` : `${schedules.length} / ${limit}`}
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>schedules used</span>
                   {atLimit && (

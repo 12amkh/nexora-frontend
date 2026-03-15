@@ -6,13 +6,13 @@ import { api, formatPlanName, normalizePlan } from "@/lib/api";
 interface UsageStatsData {
   plan: string;
   messages_used: number;
-  messages_limit: number;
+  messages_limit: number | null;
   messages_percent: number;
   agents_used: number;
-  agents_limit: number;
+  agents_limit: number | null;
   agents_percent: number;
   schedules_used: number;
-  schedules_limit: number;
+  schedules_limit: number | null;
   schedules_percent: number;
   billing_month_start: string;
   billing_month_end: string;
@@ -39,9 +39,11 @@ function MetricBar({
 }: {
   label: string;
   used: number;
-  limit: number;
+  limit: number | null;
   percent: number;
 }) {
+  const isUnlimited = limit === null;
+
   return (
     <div>
       <div
@@ -54,7 +56,7 @@ function MetricBar({
       >
         <span style={{ color: "var(--text-2)", fontSize: 14 }}>{label}</span>
         <span style={{ color: "var(--text)", fontWeight: 700, fontSize: 15 }}>
-          {used}/{limit}
+          {isUnlimited ? `${used}/Unlimited` : `${used}/${limit}`}
         </span>
       </div>
       <div
@@ -76,7 +78,7 @@ function MetricBar({
         />
       </div>
       <div style={{ color: "var(--text-3)", fontSize: 13, marginTop: 8 }}>
-        {Math.max(limit - used, 0)} remaining
+        {isUnlimited ? "Unlimited" : `${Math.max(limit - used, 0)} remaining`}
       </div>
     </div>
   );

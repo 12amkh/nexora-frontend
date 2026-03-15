@@ -54,7 +54,7 @@ export default function NewAgentPage() {
   }
 
   if (step === 'type') return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', padding: '2rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '2rem' }}>
       <div style={{ maxWidth: '860px', margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2.5rem' }}>
           <Link href="/dashboard" style={{ color: 'var(--text-3)', textDecoration: 'none' }}>← Back</Link>
@@ -63,7 +63,7 @@ export default function NewAgentPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
           {AGENT_TYPES.map(a => (
             <button key={a.type} onClick={() => { setSelectedType(a.type); setStep('details') }} style={{
-              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px',
+              background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '12px',
               padding: '1.5rem 1rem', cursor: 'pointer', textAlign: 'center',
               transition: 'border-color 0.15s, background 0.15s',
             }}
@@ -80,8 +80,8 @@ export default function NewAgentPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: '480px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', padding: '2.5rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: '480px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '2.5rem' }}>
         <button onClick={() => setStep('type')} style={{ background: 'transparent', border: 'none', color: 'var(--text-3)', cursor: 'pointer', marginBottom: '1.5rem', fontSize: '0.9rem' }}>← Back</button>
         <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>
           {AGENT_TYPES.find(a => a.type === selectedType)?.emoji}
@@ -95,9 +95,9 @@ export default function NewAgentPage() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-2)' }}>Agent name</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Research Bot" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem 1rem', color: 'var(--text)', fontSize: '0.95rem', outline: 'none' }} />
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daily Research Bot" style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem 1rem', color: 'var(--text)', fontSize: '0.95rem', outline: 'none' }} />
           <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-2)' }}>Description (optional)</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What does this agent do?" rows={3} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem 1rem', color: 'var(--text)', fontSize: '0.95rem', outline: 'none', resize: 'none', fontFamily: 'var(--font-sans)' }} />
+          <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What does this agent do?" rows={3} style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem 1rem', color: 'var(--text)', fontSize: '0.95rem', outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
           <button onClick={handleCreate} disabled={loading} style={{ marginTop: '0.5rem', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.85rem', fontWeight: 600, fontSize: '1rem', cursor: loading ? 'not-allowed' : 'pointer' }}>
             {loading ? 'Creating...' : 'Create agent →'}
           </button>
