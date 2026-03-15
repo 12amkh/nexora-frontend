@@ -2,6 +2,8 @@
 import axios from 'axios'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const USER_STORAGE_KEY = 'user'
+const THEME_STORAGE_KEY = 'nexora_theme'
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -26,7 +28,7 @@ api.interceptors.response.use(
   (err) => {
     if (typeof window !== 'undefined' && err.response?.status === 401) {
       localStorage.removeItem('token')
-      localStorage.removeItem('user')
+      localStorage.removeItem(USER_STORAGE_KEY)
       window.location.href = '/login'
     }
     return Promise.reject(err)
@@ -40,7 +42,7 @@ export const getToken = () => {
 
 export const getUser = () => {
   if (typeof window === 'undefined') return null
-  const u = localStorage.getItem('user')
+  const u = localStorage.getItem(USER_STORAGE_KEY)
   return u ? JSON.parse(u) : null
 }
 
@@ -54,15 +56,37 @@ export const refreshCurrentUser = async () => {
     headers: { Authorization: `Bearer ${token}` },
   })
 
-  localStorage.setItem('user', JSON.stringify(data))
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data))
+  if (data?.theme) {
+    localStorage.setItem(THEME_STORAGE_KEY, data.theme)
+  }
   return data
 }
 
 export const logout = () => {
   if (typeof window === 'undefined') return
   localStorage.removeItem('token')
-  localStorage.removeItem('user')
+  localStorage.removeItem(USER_STORAGE_KEY)
   window.location.href = '/login'
+}
+
+export const getStoredTheme = () => {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(THEME_STORAGE_KEY)
+}
+
+export const setStoredTheme = (theme: 'dark' | 'light') => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(THEME_STORAGE_KEY, theme)
+}
+
+export const setStoredUser = (user: Record<string, unknown>) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
+  const theme = user?.theme
+  if (typeof theme === 'string') {
+    localStorage.setItem(THEME_STORAGE_KEY, theme)
+  }
 }
 
 // ─── Error message extractor ──────────────────────────────────────────────────

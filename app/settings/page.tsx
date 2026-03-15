@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, getUser, logout, getErrorMessage, refreshCurrentUser } from '@/lib/api'
+import { api, getUser, logout, getErrorMessage, refreshCurrentUser, setStoredUser } from '@/lib/api'
+import { useTheme } from '@/components/ThemeProvider'
 
 const PLAN_COLORS: Record<string, string> = {
   free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b',
@@ -22,12 +23,14 @@ interface Stats {
 
 export default function SettingsPage() {
   const router = useRouter()
-  const [user, setUser] = useState<{ email?: string; name?: string; plan?: string } | null>(null)
+  const { theme, setTheme } = useTheme()
+  const [user, setUser] = useState<{ email?: string; name?: string; plan?: string; theme?: string } | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   
   // Profile update form
   const [nameInput, setNameInput] = useState('')
   const [updating, setUpdating] = useState(false)
+  const [savingTheme, setSavingTheme] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -79,7 +82,7 @@ export default function SettingsPage() {
       const { data } = await api.put('/users/update', { name: nameInput.trim() })
       // Update local storage so the sidebar reflects changes immediately
       const updatedUser = { ...user, name: data.name }
-      localStorage.setItem('user', JSON.stringify(updatedUser))
+      setStoredUser(updatedUser)
       setUser(updatedUser)
       setSuccessMsg('Profile updated successfully.')
       setTimeout(() => setSuccessMsg(''), 3000)
@@ -87,6 +90,27 @@ export default function SettingsPage() {
       setErrorMsg(getErrorMessage(err))
     } finally {
       setUpdating(false)
+    }
+  }
+
+  const handleThemeChange = async (nextTheme: 'dark' | 'light') => {
+    if (nextTheme === theme) return
+
+    setSavingTheme(true)
+    setErrorMsg('')
+    setSuccessMsg('')
+
+    try {
+      await setTheme(nextTheme)
+      const updatedUser = { ...user, theme: nextTheme }
+      setUser(updatedUser)
+      setStoredUser(updatedUser)
+      setSuccessMsg('Theme updated successfully.')
+      setTimeout(() => setSuccessMsg(''), 3000)
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err))
+    } finally {
+      setSavingTheme(false)
     }
   }
 
@@ -277,6 +301,43 @@ export default function SettingsPage() {
                 <StatBox label="Total Messages" value={stats?.total_messages?.toString() || '-'} />
                 <StatBox label="Messages Sent" value={stats?.messages_sent?.toString() || '-'} />
               </div>
+            </div>
+          </section>
+
+          <section style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Appearance</h2>
+            <p style={sectionDescStyle}>Choose a saved theme for your account.</p>
+
+            <div style={{ display: 'flex', gap: 16, marginTop: 20, flexWrap: 'wrap' }}>
+              {[
+                { value: 'dark', title: 'Claude Dark', desc: 'Ink-black background with soft contrast.' },
+                { value: 'light', title: 'Claude Light', desc: 'Warm paper tones with darker text.' },
+              ].map((option) => {
+                const active = theme === option.value
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => void handleThemeChange(option.value as 'dark' | 'light')}
+                    disabled={savingTheme}
+                    style={{
+                      flex: '1 1 240px',
+                      textAlign: 'left',
+                      padding: 18,
+                      borderRadius: 12,
+                      border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                      background: active ? 'var(--accent-g)' : 'var(--bg)',
+                      cursor: savingTheme ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <div style={{ color: 'var(--text)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
+                      {option.title}
+                    </div>
+                    <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.6 }}>
+                      {option.desc}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </section>
 

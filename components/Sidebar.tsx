@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getUser, logout, refreshCurrentUser } from "@/lib/api";
+import { useTheme } from "@/components/ThemeProvider";
 
 const PLAN_COLORS: Record<string, string> = {
   free: "#8888a0",
@@ -24,6 +25,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<{ email?: string; name?: string; plan?: string } | null>(() => getUser());
   const plan = user?.plan ?? "free";
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     let active = true;
@@ -146,6 +148,24 @@ export default function Sidebar() {
             </span>
           </div>
         </div>
+
+        <button
+          onClick={() => void toggleTheme()}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            padding: "0.5rem 0.75rem",
+            background: "transparent",
+            border: "none",
+            color: "var(--text-2)",
+            fontSize: "0.85rem",
+            cursor: "pointer",
+            borderRadius: 6,
+            marginBottom: 4,
+          }}
+        >
+          {theme === "dark" ? "Light theme" : "Dark theme"}
+        </button>
 
         <button
           onClick={logout}

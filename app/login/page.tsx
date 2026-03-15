@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, setStoredTheme, setStoredUser } from '@/lib/api'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -27,7 +27,10 @@ export default function LoginPage() {
       const { data: user } = await api.get('/users/me', {
         headers: { Authorization: `Bearer ${data.access_token}` },
       })
-      localStorage.setItem('user', JSON.stringify(user))
+      setStoredUser(user)
+      if (user?.theme === 'dark' || user?.theme === 'light') {
+        setStoredTheme(user.theme)
+      }
       router.push('/dashboard')
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } }
