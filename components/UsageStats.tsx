@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, formatPlanName, normalizePlan } from "@/lib/api";
 
 interface UsageStatsData {
   plan: string;
@@ -117,6 +117,7 @@ export default function UsageStats() {
     stats.messages_percent >= 80 ||
     stats.agents_percent >= 80 ||
     stats.schedules_percent >= 80;
+  const plan = normalizePlan(stats.plan);
 
   return (
     <section
@@ -141,8 +142,8 @@ export default function UsageStats() {
         </h2>
         <p style={{ color: "var(--text-2)", fontSize: 15, margin: 0 }}>
           Plan:{" "}
-          <span style={{ color: "var(--accent)", textTransform: "capitalize" }}>
-            {stats.plan}
+          <span style={{ color: "var(--accent)" }}>
+            {formatPlanName(plan)}
           </span>
           {" "}• Billing period: {formatDate(stats.billing_month_start)} –{" "}
           {formatDate(stats.billing_month_end)}

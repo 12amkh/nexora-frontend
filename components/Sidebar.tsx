@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getUser, logout, refreshCurrentUser } from "@/lib/api";
+import { formatPlanName, getUser, logout, normalizePlan, refreshCurrentUser } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
 
 const PLAN_COLORS: Record<string, string> = {
@@ -24,7 +24,7 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<{ email?: string; name?: string; plan?: string } | null>(() => getUser());
-  const plan = user?.plan ?? "free";
+  const plan = normalizePlan(user?.plan);
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -141,10 +141,9 @@ export default function Sidebar() {
               style={{
                 fontSize: "0.75rem",
                 color: "var(--text-2)",
-                textTransform: "capitalize",
               }}
             >
-              {plan} plan
+              {formatPlanName(plan)} plan
             </span>
           </div>
         </div>

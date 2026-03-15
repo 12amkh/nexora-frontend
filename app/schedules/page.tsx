@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, getUser, logout, getErrorMessage, normalizePlan, refreshCurrentUser } from '@/lib/api'
+import { api, formatPlanName, getUser, logout, getErrorMessage, normalizePlan, refreshCurrentUser } from '@/lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ const PLAN_LIMITS: Record<string, number> = {
 }
 
 const PLAN_COLORS: Record<string, string> = {
-  free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b',
+  free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b', enterprise: '#ec4899',
 }
 
 const PENDING_TASKS_STORAGE_KEY = 'nexora_pending_schedule_tasks'
@@ -563,7 +563,7 @@ export default function SchedulesPage() {
                 background: PLAN_COLORS[plan], display: 'inline-block',
               }} />
               <span style={{ fontSize: '0.75rem', color: 'var(--text-2)', textTransform: 'capitalize' }}>
-                {plan} plan
+                {formatPlanName(plan)} plan
               </span>
             </div>
           </div>

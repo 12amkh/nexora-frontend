@@ -4,11 +4,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, getUser, logout, getErrorMessage, refreshCurrentUser, setStoredUser } from '@/lib/api'
+import { api, formatPlanName, getUser, logout, getErrorMessage, normalizePlan, refreshCurrentUser, setStoredUser } from '@/lib/api'
 import { useTheme } from '@/components/ThemeProvider'
 
 const PLAN_COLORS: Record<string, string> = {
-  free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b',
+  free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b', enterprise: '#ec4899',
 }
 
 interface Stats {
@@ -134,7 +134,7 @@ export default function SettingsPage() {
     }
   }
 
-  const plan = user?.plan || 'free'
+  const plan = normalizePlan(user?.plan)
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
@@ -174,9 +174,9 @@ export default function SettingsPage() {
                 background: PLAN_COLORS[plan], display: 'inline-block',
               }} />
               <span style={{
-                fontSize: '0.75rem', color: 'var(--text-2)', textTransform: 'capitalize',
+                fontSize: '0.75rem', color: 'var(--text-2)',
               }}>
-                {plan} plan
+                {formatPlanName(plan)} plan
               </span>
             </div>
           </div>
@@ -289,7 +289,7 @@ export default function SettingsPage() {
                     background: PLAN_COLORS[plan], display: 'inline-block',
                   }} />
                   <span style={{ color: 'var(--text)', fontWeight: 600, textTransform: 'capitalize', fontSize: 14 }}>
-                    {plan}
+                    {formatPlanName(plan)}
                   </span>
                 </div>
               </div>

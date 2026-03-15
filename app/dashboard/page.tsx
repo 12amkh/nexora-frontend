@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, getErrorMessage, getUser, logout, refreshCurrentUser } from "@/lib/api";
+import { api, formatPlanName, getErrorMessage, getUser, logout, refreshCurrentUser } from "@/lib/api";
 import Sidebar from "@/components/Sidebar";
 import AgentCard from "@/components/AgentCard";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -112,6 +112,8 @@ export default function Dashboard() {
     );
   }
 
+  const planLabel = formatPlanName(user.plan);
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
       <ConfirmDialog
@@ -167,7 +169,7 @@ export default function Dashboard() {
                   borderRadius: 999,
                 }}
               >
-                {user.plan.charAt(0).toUpperCase() + user.plan.slice(1)}
+                {planLabel}
               </span>
               <button
                 onClick={handleLogout}

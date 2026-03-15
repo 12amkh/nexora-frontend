@@ -98,6 +98,11 @@ export const normalizePlan = (plan: unknown) => {
     : 'free'
 }
 
+export const formatPlanName = (plan: unknown) => {
+  const normalized = normalizePlan(plan)
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+}
+
 // ─── Error message extractor ──────────────────────────────────────────────────
 // Axios wraps backend errors inside err.response.data
 // FastAPI validation errors (422) come as:
