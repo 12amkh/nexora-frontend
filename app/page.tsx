@@ -11,10 +11,11 @@ const FEATURES = [
 ]
 
 const PLANS = [
-  { name: 'Free', price: '$0', period: '', agents: '3 agents', schedules: 'No scheduling', cta: 'Get started', accent: false },
-  { name: 'Starter', price: '$19', period: '/mo', agents: '5 agents', schedules: '3 schedules', cta: 'Start free trial', accent: false },
-  { name: 'Pro', price: '$49', period: '/mo', agents: '20 agents', schedules: '10 schedules', cta: 'Go Pro', accent: true },
-  { name: 'Business', price: '$149', period: '/mo', agents: '100 agents', schedules: '50 schedules', cta: 'Scale up', accent: false },
+  { name: 'Free', price: '$0', period: '', agents: '3 agents', messages: '100 messages / month', schedules: 'No scheduling', cta: 'Get started', accent: false },
+  { name: 'Starter', price: '$19', period: '/mo', agents: '5 agents', messages: '5,000 messages / month', schedules: '3 schedules', cta: 'Start free trial', accent: false },
+  { name: 'Pro', price: '$49', period: '/mo', agents: '20 agents', messages: '50,000 messages / month', schedules: '10 schedules', cta: 'Go Pro', accent: true },
+  { name: 'Business', price: '$149', period: '/mo', agents: '100 agents', messages: '500,000 messages / month', schedules: '50 schedules', cta: 'Scale up', accent: false },
+  { name: 'Enterprise', price: 'Custom', period: '', agents: 'Unlimited agents', messages: 'Unlimited messages', schedules: 'Unlimited schedules', cta: 'Contact sales', accent: false },
 ]
 
 const NAV: React.CSSProperties = {
@@ -174,6 +175,7 @@ export default function LandingPage() {
                 <span style={{ fontSize: '0.9rem', color: 'var(--text-2)' }}>{p.period}</span>
               </div>
               <div style={{ fontSize: '0.875rem', color: 'var(--text-2)', marginBottom: '0.4rem' }}>✓ {p.agents}</div>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-2)', marginBottom: '0.4rem' }}>✓ {p.messages}</div>
               <div style={{ fontSize: '0.875rem', color: 'var(--text-2)', marginBottom: '1.5rem' }}>✓ {p.schedules}</div>
               <Link href="/register" style={{
                 display: 'block', textAlign: 'center',
