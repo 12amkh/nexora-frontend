@@ -280,29 +280,56 @@ export default function UpgradePage() {
                     ))}
                   </div>
 
-                  <Link
-                    href={plan.name === 'enterprise' ? '/settings' : isLoggedIn ? '/settings' : '/register'}
-                    style={{
-                      display: 'block',
-                      textAlign: 'center',
-                      padding: '11px 14px',
-                      borderRadius: 12,
-                      background: isCurrent ? 'var(--bg-3)' : plan.accent || canUpgrade ? 'var(--accent)' : 'var(--bg-3)',
-                      color: (plan.accent || canUpgrade) && !isCurrent ? '#fff' : 'var(--text)',
-                      border: isCurrent ? '1px solid var(--border-2)' : 'none',
-                      fontSize: 14,
-                      fontWeight: 700,
-                      textDecoration: 'none',
-                    }}
-                  >
-                    {plan.name === 'enterprise'
-                      ? 'Contact sales'
-                      : isCurrent
-                        ? 'Current plan'
-                        : canUpgrade
-                          ? `Upgrade to ${plan.title}`
-                          : 'Available'}
-                  </Link>
+                  {isCurrent ? (
+                    <div
+                      style={{
+                        display: 'block',
+                        textAlign: 'center',
+                        padding: '11px 14px',
+                        borderRadius: 12,
+                        background: 'var(--bg-3)',
+                        color: 'var(--text-2)',
+                        border: '1px solid var(--border-2)',
+                        fontSize: 14,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Current Plan
+                    </div>
+                  ) : canUpgrade ? (
+                    <Link
+                      href="/dashboard/upgrade"
+                      style={{
+                        display: 'block',
+                        textAlign: 'center',
+                        padding: '11px 14px',
+                        borderRadius: 12,
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        fontSize: 14,
+                        fontWeight: 700,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Upgrade
+                    </Link>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'block',
+                        textAlign: 'center',
+                        padding: '11px 14px',
+                        borderRadius: 12,
+                        background: 'var(--bg-3)',
+                        color: 'var(--text-3)',
+                        border: '1px solid var(--border)',
+                        fontSize: 14,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Available
+                    </div>
+                  )}
                 </section>
               )
             })}
