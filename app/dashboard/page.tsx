@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api, getErrorMessage, getUser, logout } from "@/lib/api";
 import Sidebar from "@/components/Sidebar";
 import AgentCard from "@/components/AgentCard";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import UsageStats from "@/components/UsageStats";
 
 interface Agent {
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingAgentId, setDeletingAgentId] = useState<number | null>(null);
+  const [agentPendingDelete, setAgentPendingDelete] = useState<Agent | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -65,19 +67,19 @@ export default function Dashboard() {
 
   const handleDeleteAgent = async (agent: Agent) => {
     if (deletingAgentId) return;
+    setAgentPendingDelete(agent);
+  };
 
-    const confirmed = window.confirm(
-      `Delete "${agent.name}"?\n\nThis will also remove its conversation history and cannot be undone.`
-    );
+  const confirmDeleteAgent = async () => {
+    if (!agentPendingDelete) return;
 
-    if (!confirmed) return;
-
-    setDeletingAgentId(agent.id);
+    setDeletingAgentId(agentPendingDelete.id);
     setError("");
 
     try {
-      await api.delete(`/agents/${agent.id}`);
-      setAgents((prev) => prev.filter((item) => item.id !== agent.id));
+      await api.delete(`/agents/${agentPendingDelete.id}`);
+      setAgents((prev) => prev.filter((item) => item.id !== agentPendingDelete.id));
+      setAgentPendingDelete(null);
     } catch (err: unknown) {
       setError(getErrorMessage(err));
     } finally {
@@ -96,6 +98,21 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
+      <ConfirmDialog
+        open={!!agentPendingDelete}
+        title={agentPendingDelete ? `Delete ${agentPendingDelete.name}?` : "Delete agent?"}
+        description="This will permanently remove the agent and all of its conversation history. This action cannot be undone."
+        confirmLabel="Delete agent"
+        cancelLabel="Keep agent"
+        destructive
+        loading={agentPendingDelete ? deletingAgentId === agentPendingDelete.id : false}
+        onConfirm={confirmDeleteAgent}
+        onCancel={() => {
+          if (!deletingAgentId) {
+            setAgentPendingDelete(null);
+          }
+        }}
+      />
       <Sidebar />
       <main style={{ marginLeft: 220, flex: 1, padding: "40px 48px" }}>
         <div style={{ maxWidth: 1400 }}>
