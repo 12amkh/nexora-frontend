@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { api, formatPlanName, getUser, logout, getErrorMessage, normalizePlan, refreshCurrentUser } from '@/lib/api'
+import RichContent from '@/components/RichContent'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -918,12 +919,11 @@ export default function SchedulesPage() {
                           color: taskResult.status === 'success' ? 'var(--text)' : tone.text,
                           fontSize: 13,
                           lineHeight: 1.7,
-                          whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
                           maxHeight: 260,
                           overflowY: 'auto',
                         }}>
-                          {taskResult.result}
+                          <RichContent content={taskResult.result} />
                         </div>
                       )}
                     </div>
