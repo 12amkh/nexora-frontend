@@ -26,6 +26,7 @@ const QUICK_ACTIONS = [
 interface Message {
   role: 'user' | 'assistant'
   content: string
+  createdAt?: string
 }
 
 interface Report {
@@ -265,6 +266,43 @@ function AssistantMessageContent({ content }: { content: string }) {
   )
 }
 
+function formatTimeLabel(value?: string): string {
+  if (!value) return 'Now'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Now'
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function formatDateDivider(value?: string): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function buildFollowUpPrompts(messages: Message[]): Array<{ label: string; prompt: string }> {
+  const lastAssistant = [...messages].reverse().find(message => message.role === 'assistant' && message.content.trim())
+  if (!lastAssistant) return []
+
+  const lastReply = lastAssistant.content.replace(/\s+/g, ' ').trim()
+  const preview = lastReply.length > 220 ? `${lastReply.slice(0, 217).trimEnd()}...` : lastReply
+
+  return [
+    {
+      label: 'Go deeper',
+      prompt: `Go deeper on your last answer. Expand the strongest points and add more detail where it matters.\n\nPrevious answer:\n${preview}`,
+    },
+    {
+      label: 'Summarize context',
+      prompt: `Summarize our recent conversation so far into the key ideas, decisions, and next steps.\n\nRecent context:\n${preview}`,
+    },
+    {
+      label: 'Next actions',
+      prompt: `Based on our conversation so far, turn the latest answer into concrete next actions I should take.\n\nLatest answer:\n${preview}`,
+    },
+  ]
+}
+
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
@@ -280,6 +318,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [error, setError] = useState('')
   const [upgradeMessage, setUpgradeMessage] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const recentContext = messages.slice(-4)
+  const followUpActions = buildFollowUpPrompts(messages)
 
   useEffect(() => {
     if (!localStorage.getItem('token')) {
@@ -313,9 +353,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     try {
       const { data } = await api.get(`/chat/history/${id}?limit=50`)
       setMessages(
-        data.map((message: { role: string; message: string }) => ({
+        data.map((message: { role: string; message: string; created_at?: string }) => ({
           role: message.role as 'user' | 'assistant',
           content: message.message,
+          createdAt: message.created_at,
         }))
       )
     } catch {
@@ -346,9 +387,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
     const userMessage = nextMessage.trim()
     setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    const createdAt = new Date().toISOString()
+    setMessages(prev => [...prev, { role: 'user', content: userMessage, createdAt }])
     setStreaming(true)
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+    setMessages(prev => [...prev, { role: 'assistant', content: '', createdAt }])
 
     try {
       const response = await fetch(`${API_URL}/chat/stream`, {
@@ -399,6 +441,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 updated[updated.length - 1] = {
                   role: 'assistant',
                   content: updated[updated.length - 1].content + event.token,
+                  createdAt: updated[updated.length - 1].createdAt,
                 }
                 return updated
               })
@@ -412,7 +455,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
       setMessages(prev => {
         const updated = [...prev]
-        updated[updated.length - 1] = { role: 'assistant', content: message }
+        updated[updated.length - 1] = {
+          role: 'assistant',
+          content: message,
+          createdAt: updated[updated.length - 1].createdAt,
+        }
         return updated
       })
     } finally {
@@ -554,13 +601,76 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 </button>
               ))}
             </div>
+            {recentContext.length > 1 && (
+              <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '0.95rem 1rem', display: 'grid', gap: '0.7rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                  <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: '0.9rem' }}>Recent context</div>
+                  <div style={{ color: 'var(--text-3)', fontSize: '0.76rem' }}>Conversation continues from your latest turns</div>
+                </div>
+                <div style={{ display: 'grid', gap: '0.6rem' }}>
+                  {recentContext.map((message, index) => (
+                    <div key={`context-${index}`} style={{ display: 'grid', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                        <span style={{ color: message.role === 'user' ? 'var(--accent)' : 'var(--text)', fontSize: '0.78rem', fontWeight: 700 }}>
+                          {message.role === 'user' ? 'You' : agent?.name || 'Agent'}
+                        </span>
+                        <span style={{ color: 'var(--text-3)', fontSize: '0.74rem' }}>
+                          {formatTimeLabel(message.createdAt)}
+                        </span>
+                      </div>
+                      <div style={{ color: 'var(--text-2)', fontSize: '0.84rem', lineHeight: 1.65 }}>
+                        {message.content.length > 180 ? `${message.content.slice(0, 177).trimEnd()}...` : message.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {followUpActions.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem' }}>
+                {followUpActions.map(action => (
+                  <button
+                    key={action.label}
+                    onClick={() => sendMessage(action.prompt)}
+                    disabled={streaming}
+                    style={{
+                      background: 'rgba(217,121,85,0.08)',
+                      color: streaming ? 'var(--text-3)' : 'var(--accent)',
+                      border: '1px solid rgba(217,121,85,0.18)',
+                      borderRadius: '999px',
+                      padding: '0.55rem 0.9rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: streaming ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
             {messages.length === 0 && agent && (
               <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '3rem 1rem', fontSize: '0.9rem' }}>
                 {agent.config?.welcome_message || `Hi! I'm ${agent.name}. How can I help?`}
               </div>
             )}
             {messages.map((message, index) => (
-              <div key={index} style={{ display: 'flex', justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <div key={index}>
+                {(() => {
+                  const currentDay = formatDateDivider(message.createdAt)
+                  const previousDay = index > 0 ? formatDateDivider(messages[index - 1].createdAt) : null
+                  if (currentDay && currentDay !== previousDay) {
+                    return (
+                      <div style={{ display: 'flex', justifyContent: 'center', margin: '0.25rem 0 0.85rem' }}>
+                        <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '999px', padding: '0.32rem 0.7rem', color: 'var(--text-3)', fontSize: '0.74rem' }}>
+                          {currentDay}
+                        </div>
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
+              <div style={{ display: 'flex', justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 <div
                   style={{
                     maxWidth: '75%',
@@ -574,6 +684,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                     wordBreak: 'break-word',
                   }}
                 >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                    <span style={{ color: message.role === 'user' ? 'rgba(255,255,255,0.82)' : 'var(--text-3)', fontSize: '0.74rem', fontWeight: 700 }}>
+                      {message.role === 'user' ? 'You' : agent?.name || 'Agent'}
+                    </span>
+                    <span style={{ color: message.role === 'user' ? 'rgba(255,255,255,0.72)' : 'var(--text-3)', fontSize: '0.72rem' }}>
+                      {formatTimeLabel(message.createdAt)}
+                    </span>
+                  </div>
                   {message.role === 'assistant' ? (
                     <AssistantMessageContent content={message.content} />
                   ) : (
@@ -583,6 +701,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                     <span style={{ display: 'inline-block', width: '7px', height: '14px', background: 'var(--accent)', borderRadius: '2px', animation: 'blink 0.8s infinite', verticalAlign: 'middle' }} />
                   )}
                 </div>
+              </div>
               </div>
             ))}
             <div ref={bottomRef} />
