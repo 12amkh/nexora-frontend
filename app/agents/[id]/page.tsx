@@ -151,26 +151,48 @@ function parseAssistantContent(content: string): RenderBlock[] {
   return blocks.length > 0 ? blocks : [{ type: 'paragraph', content }]
 }
 
-function renderInlineText(text: string) {
-  const parts = text.split(/(https?:\/\/[^\s]+)/g)
+function renderFormattedText(text: string) {
+  const labelMatch = text.match(/^([A-Za-z][A-Za-z0-9\s/&-]{1,40}:)\s+(.*)$/)
+  const parts = (labelMatch ? labelMatch[2] : text).split(/(https?:\/\/[^\s]+|\*\*[^*]+\*\*)/g)
+  const renderedParts = parts
+    .filter(Boolean)
+    .map((part, index) => {
+      if (/^https?:\/\/[^\s]+$/.test(part)) {
+        return (
+          <a
+            key={`${part}-${index}`}
+            href={part}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: 'var(--accent)', textDecoration: 'underline', textUnderlineOffset: '3px' }}
+          >
+            {part}
+          </a>
+        )
+      }
 
-  return parts.map((part, index) => {
-    if (/^https?:\/\/[^\s]+$/.test(part)) {
-      return (
-        <a
-          key={`${part}-${index}`}
-          href={part}
-          target="_blank"
-          rel="noreferrer"
-          style={{ color: 'var(--accent)', textDecoration: 'underline', textUnderlineOffset: '3px' }}
-        >
-          {part}
-        </a>
-      )
-    }
+      if (/^\*\*[^*]+\*\*$/.test(part)) {
+        return (
+          <strong key={`bold-${index}`} style={{ color: 'var(--text)', fontWeight: 700 }}>
+            {part.slice(2, -2)}
+          </strong>
+        )
+      }
 
-    return <span key={`text-${index}`}>{part}</span>
-  })
+      return <span key={`text-${index}`}>{part}</span>
+    })
+
+  if (!labelMatch) {
+    return renderedParts
+  }
+
+  return [
+    <strong key="label" style={{ color: 'var(--text)', fontWeight: 700 }}>
+      {labelMatch[1]}
+    </strong>,
+    <span key="label-space"> </span>,
+    ...renderedParts,
+  ]
 }
 
 function AssistantMessageContent({ content }: { content: string }) {
@@ -202,7 +224,7 @@ function AssistantMessageContent({ content }: { content: string }) {
               key={`paragraph-${index}`}
               style={{ margin: 0, color: 'var(--text-2)', fontSize: '0.92rem', lineHeight: 1.8 }}
             >
-              {renderInlineText(block.content)}
+              {renderFormattedText(block.content)}
             </p>
           )
         }
@@ -221,7 +243,7 @@ function AssistantMessageContent({ content }: { content: string }) {
               <ul style={{ margin: 0, paddingLeft: '1.15rem', display: 'grid', gap: '0.6rem' }}>
                 {block.items.map((item, itemIndex) => (
                   <li key={`bullet-item-${itemIndex}`} style={{ color: 'var(--text-2)', lineHeight: 1.75, paddingLeft: '0.2rem' }}>
-                    {renderInlineText(item)}
+                    {renderFormattedText(item)}
                   </li>
                 ))}
               </ul>
@@ -233,7 +255,7 @@ function AssistantMessageContent({ content }: { content: string }) {
           <ol key={`numbers-${index}`} style={{ margin: 0, paddingLeft: '1.2rem', display: 'grid', gap: '0.7rem' }}>
             {block.items.map((item, itemIndex) => (
               <li key={`number-item-${itemIndex}`} style={{ color: 'var(--text-2)', lineHeight: 1.75, paddingLeft: '0.25rem' }}>
-                {renderInlineText(item)}
+                {renderFormattedText(item)}
               </li>
             ))}
           </ol>
