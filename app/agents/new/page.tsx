@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api } from '@/lib/api'
+import { api, getErrorMessage } from '@/lib/api'
 
 const AGENT_TYPES = [
   { type: 'web_researcher', emoji: '🔍', label: 'Web Researcher' },
@@ -29,6 +29,7 @@ export default function NewAgentPage() {
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const showUpgrade = /limit reached|upgrade|max/i.test(error)
 
   useEffect(() => {
     if (!localStorage.getItem('token')) router.push('/login')
@@ -46,8 +47,7 @@ export default function NewAgentPage() {
       })
       router.push(`/agents/${data.id}`)
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } }
-      setError(e.response?.data?.detail || 'Failed to create agent.')
+      setError(getErrorMessage(err) || 'Failed to create agent.')
     } finally {
       setLoading(false)
     }
@@ -91,7 +91,16 @@ export default function NewAgentPage() {
           {AGENT_TYPES.find(a => a.type === selectedType)?.label} — you can customize everything after creation.
         </p>
 
-        {error && <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: '8px', padding: '0.75rem 1rem', color: 'var(--red)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>{error}</div>}
+        {error && (
+          <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: '8px', padding: '0.75rem 1rem', color: 'var(--red)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+            <div>{error}</div>
+            {showUpgrade && (
+              <Link href="/" style={{ display: 'inline-block', marginTop: '0.55rem', color: 'var(--text)', fontWeight: 700, textDecoration: 'underline' }}>
+                Upgrade to create more agents
+              </Link>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <label style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-2)' }}>Agent name</label>

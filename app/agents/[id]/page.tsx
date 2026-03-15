@@ -28,6 +28,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [streaming, setStreaming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+  const [upgradeMessage, setUpgradeMessage] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const sendMessage = async () => {
     if (!input.trim() || streaming) return
     setError('')
+    setUpgradeMessage('')
     const userMsg = input.trim()
     setInput('')
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
@@ -75,6 +77,21 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         },
         body: JSON.stringify({ agent_id: Number(id), message: userMsg }),
       })
+
+      if (!response.ok) {
+        let detail = 'Something went wrong. Please try again.'
+        try {
+          const payload = await response.json()
+          if (typeof payload?.detail === 'string') {
+            detail = payload.detail
+          }
+        } catch { /* ignore non-json error payloads */ }
+
+        if (/limit reached|upgrade|max/i.test(detail)) {
+          setUpgradeMessage(detail)
+        }
+        throw new Error(detail)
+      }
 
       const reader = response.body!.getReader()
       const decoder = new TextDecoder()
@@ -102,10 +119,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           } catch { /* skip malformed */ }
         }
       }
-    } catch {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
       setMessages(prev => {
         const updated = [...prev]
-        updated[updated.length - 1] = { role: 'assistant', content: 'Something went wrong. Please try again.' }
+        updated[updated.length - 1] = { role: 'assistant', content: message }
         return updated
       })
     } finally {
@@ -176,6 +194,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         <div style={{ maxWidth: '900px', width: '100%', margin: '1rem auto 0', padding: '0 2rem' }}>
           <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid var(--red)', borderRadius: '10px', color: 'var(--red)', padding: '0.9rem 1rem', fontSize: '0.9rem' }}>
             {error}
+          </div>
+        </div>
+      )}
+
+      {upgradeMessage && (
+        <div style={{ maxWidth: '900px', width: '100%', margin: '1rem auto 0', padding: '0 2rem' }}>
+          <div style={{ background: 'rgba(217,121,85,0.1)', border: '1px solid var(--accent)', borderRadius: '10px', color: 'var(--text)', padding: '0.9rem 1rem', fontSize: '0.9rem' }}>
+            <span>{upgradeMessage}</span>
+            <Link href="/" style={{ marginLeft: 8, color: 'var(--accent)', fontWeight: 700, textDecoration: 'underline' }}>
+              Upgrade plan
+            </Link>
           </div>
         </div>
       )}

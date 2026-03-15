@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api, formatPlanName, normalizePlan } from "@/lib/api";
 
 interface UsageStatsData {
@@ -192,6 +193,17 @@ export default function UsageStats() {
           }}
         >
           You're approaching your plan limits. Upgrade to continue using Nexora without restrictions.
+          <Link
+            href="/"
+            style={{
+              marginLeft: 8,
+              color: "var(--text)",
+              fontWeight: 700,
+              textDecoration: "underline",
+            }}
+          >
+            View plans
+          </Link>
         </div>
       )}
     </section>
