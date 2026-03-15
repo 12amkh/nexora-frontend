@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { api, formatPlanName, getUser, logout, getErrorMessage, normalizePlan, refreshCurrentUser, setStoredUser } from '@/lib/api'
 import { useTheme } from '@/components/ThemeProvider'
+import UsageStats from '@/components/UsageStats'
 
 const PLAN_COLORS: Record<string, string> = {
   free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b', enterprise: '#ec4899',
@@ -275,6 +276,10 @@ export default function SettingsPage() {
           <section style={cardStyle}>
             <h2 style={sectionTitleStyle}>Plan & Usage</h2>
             <p style={sectionDescStyle}>Your current subscription and platform usage.</p>
+
+            <div style={{ marginTop: 20 }}>
+              <UsageStats />
+            </div>
             
             <div style={{ 
               marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16,
