@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { getUser, logout } from "@/lib/api";
 
 const PLAN_COLORS: Record<string, string> = {
@@ -13,72 +13,136 @@ const PLAN_COLORS: Record<string, string> = {
 };
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/agents/new", label: "New Agent" },
-  { href: "/schedules", label: "Schedules" },
-  { href: "/settings", label: "Settings" },
-  { href: "/admin", label: "Admin" },
+  { href: "/dashboard", label: "🤖  Agents" },
+  { href: "/schedules", label: "⏰  Schedules" },
+  { href: "/settings", label: "⚙️  Settings" },
+  { href: "/admin", label: "🛠  Admin" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const user = getUser();
   const plan = user?.plan ?? "free";
 
   return (
-    <aside className="fixed left-0 top-0 z-10 flex min-h-screen w-[220px] flex-col border-r border-border bg-bg-2 px-4 py-5">
+    <aside
+      style={{
+        width: 220,
+        minHeight: "100vh",
+        background: "var(--bg-2)",
+        borderRight: "1px solid var(--border)",
+        display: "flex",
+        flexDirection: "column",
+        padding: "20px 16px",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        zIndex: 10,
+      }}
+    >
       <Link
         href="/dashboard"
-        className="mb-5 block px-3 py-2 text-xl font-extrabold tracking-tight text-text"
+        style={{
+          fontWeight: 800,
+          fontSize: "1.2rem",
+          letterSpacing: "-0.03em",
+          padding: "0.5rem 0.75rem",
+          display: "block",
+          marginBottom: "1.25rem",
+          color: "var(--text)",
+          textDecoration: "none",
+        }}
       >
         Nexora
       </Link>
 
-      <nav className="space-y-1">
-        {NAV_ITEMS.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+      {NAV_ITEMS.map((item) => {
+        const isActive =
+          pathname === item.href ||
+          (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`block rounded-lg px-3 py-2 text-sm transition ${
-                isActive
-                  ? "bg-accent/15 text-accent"
-                  : "text-text-2 hover:bg-bg-3 hover:text-text"
-              }`}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            style={{
+              display: "block",
+              padding: "0.5rem 0.75rem",
+              borderRadius: 7,
+              fontSize: "0.875rem",
+              fontWeight: isActive ? 600 : 400,
+              background: isActive ? "var(--accent-g)" : "transparent",
+              color: isActive ? "var(--text)" : "var(--text-2)",
+              border: isActive
+                ? "1px solid rgba(108,99,255,0.2)"
+                : "1px solid transparent",
+              marginBottom: "0.1rem",
+              textDecoration: "none",
+            }}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
 
-      <div className="mt-auto border-t border-border pt-4">
-        <div className="px-3 pb-3">
-          <p className="truncate text-sm font-semibold text-text">
+      <div
+        style={{
+          marginTop: "auto",
+          borderTop: "1px solid var(--border)",
+          paddingTop: "1rem",
+        }}
+      >
+        <div style={{ padding: "0.5rem 0.75rem" }}>
+          <div
+            style={{
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              color: "var(--text)",
+              marginBottom: "0.15rem",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
             {user?.name || user?.email || "Nexora User"}
-          </p>
-          <div className="mt-1 flex items-center gap-2">
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: PLAN_COLORS[plan] || PLAN_COLORS.free }}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: PLAN_COLORS[plan] || PLAN_COLORS.free,
+                display: "inline-block",
+              }}
             />
-            <span className="text-xs capitalize text-text-2">{plan} plan</span>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                color: "var(--text-2)",
+                textTransform: "capitalize",
+              }}
+            >
+              {plan} plan
+            </span>
           </div>
         </div>
 
         <button
-          onClick={() => {
-            logout();
-            router.push("/login");
+          onClick={logout}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            padding: "0.5rem 0.75rem",
+            background: "transparent",
+            border: "none",
+            color: "var(--text-3)",
+            fontSize: "0.85rem",
+            cursor: "pointer",
+            borderRadius: 6,
           }}
-          className="w-full rounded-lg px-3 py-2 text-left text-sm text-text-3 transition hover:bg-bg-3 hover:text-text"
         >
-          Sign Out
+          Sign out
         </button>
       </div>
     </aside>

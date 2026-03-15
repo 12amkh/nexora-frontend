@@ -62,74 +62,144 @@ export default function Dashboard() {
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen bg-bg">
+      <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
         <Sidebar />
-        <div className="flex-1 pl-[220px]">
-          <div className="p-8 text-text">Loading...</div>
-        </div>
+        <main style={{ marginLeft: 220, flex: 1, padding: "40px 48px", color: "var(--text)" }}>Loading...</main>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-bg">
+    <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
       <Sidebar />
-      <div className="flex-1 pl-[220px]">
-        <div className="p-8">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-8">
+      <main style={{ marginLeft: 220, flex: 1, padding: "40px 48px" }}>
+        <div style={{ maxWidth: 1400 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 20,
+              marginBottom: 28,
+            }}
+          >
             <div>
-              <h1 className="text-3xl font-bold text-text mb-2">Dashboard</h1>
-              <p className="text-text-2">Welcome back, {user.name}!</p>
+              <h1
+                style={{
+                  fontSize: 28,
+                  fontWeight: 700,
+                  color: "var(--text)",
+                  margin: "0 0 8px",
+                  letterSpacing: "-0.03em",
+                }}
+              >
+                Dashboard
+              </h1>
+              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 16 }}>
+                Welcome back, {user.name}!
+              </p>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-text-2 text-sm bg-accent-g px-3 py-1 rounded-full">
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <span
+                style={{
+                  color: "var(--text-2)",
+                  fontSize: 14,
+                  background: "var(--accent-g)",
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                }}
+              >
                 {user.plan.charAt(0).toUpperCase() + user.plan.slice(1)}
               </span>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 text-text-2 hover:text-text transition"
+                style={{
+                  padding: "8px 14px",
+                  color: "var(--text-2)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
               >
                 Sign Out
               </button>
             </div>
           </div>
 
-          {/* NEW: Usage Stats Component */}
           <UsageStats />
 
-          {/* Agents Section */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-text">Your Agents</h2>
+          <section>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+                marginBottom: 22,
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: 24,
+                  fontWeight: 700,
+                  color: "var(--text)",
+                  margin: 0,
+                }}
+              >
+                Your Agents
+              </h2>
               <Link
                 href="/agents/new"
-                className="px-6 py-2 bg-accent text-bg rounded-lg font-medium hover:bg-accent/90 transition"
+                style={{
+                  padding: "10px 18px",
+                  background: "var(--accent)",
+                  color: "#fff",
+                  borderRadius: 10,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
               >
                 Create Agent
               </Link>
             </div>
 
             {agents.length === 0 ? (
-              <div className="bg-bg-2 border border-border rounded-lg p-12 text-center">
-                <p className="text-text-2 mb-4">No agents yet.</p>
+              <div
+                style={{
+                  background: "var(--bg-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 16,
+                  padding: "48px 24px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ color: "var(--text-2)", margin: "0 0 16px", fontSize: 16 }}>
+                  No agents yet.
+                </p>
                 <Link
                   href="/agents/new"
-                  className="text-accent hover:underline font-medium"
+                  style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
                 >
                   Create your first agent →
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                  gap: 20,
+                }}
+              >
                 {agents.map((agent) => (
                   <AgentCard key={agent.id} agent={agent} />
                 ))}
               </div>
             )}
-          </div>
+          </section>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

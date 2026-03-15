@@ -20,25 +20,84 @@ export default function AgentCard({ agent }: { agent: Agent }) {
   return (
     <Link
       href={`/agents/${agent.id}`}
-      className="block rounded-xl border border-border bg-bg-2 p-5 transition hover:border-accent/40 hover:bg-bg-3"
+      style={{
+        display: "block",
+        background: "var(--bg-2)",
+        border: "1px solid var(--border)",
+        borderRadius: 16,
+        padding: "20px 22px",
+        color: "inherit",
+        textDecoration: "none",
+      }}
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="mb-1 text-lg font-semibold text-text">{agent.name}</h3>
-          <p className="text-xs uppercase tracking-[0.16em] text-text-3">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: "var(--text)",
+              marginBottom: 6,
+            }}
+          >
+            {agent.name}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--text-3)",
+            }}
+          >
             {agentType}
-          </p>
+          </div>
         </div>
-        <span className="rounded-full bg-accent/10 px-2 py-1 text-xs capitalize text-accent">
+        <span
+          style={{
+            padding: "4px 10px",
+            borderRadius: 999,
+            fontSize: 12,
+            color: "var(--accent)",
+            background: "rgba(108,99,255,0.12)",
+            whiteSpace: "nowrap",
+            textTransform: "capitalize",
+          }}
+        >
           {tone}
         </span>
       </div>
 
-      <p className="mb-4 min-h-12 text-sm leading-6 text-text-2">
+      <div
+        style={{
+          color: "var(--text-2)",
+          fontSize: 14,
+          lineHeight: 1.6,
+          minHeight: 72,
+          marginBottom: 16,
+        }}
+      >
         {agent.description || "No description yet. Open this agent to start chatting and customizing it."}
-      </p>
+      </div>
 
-      <div className="flex items-center justify-between text-xs text-text-3">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          fontSize: 13,
+          color: "var(--text-3)",
+        }}
+      >
         <span>
           {agent.config?.use_web_search ? "Web search enabled" : "Knowledge only"}
         </span>
