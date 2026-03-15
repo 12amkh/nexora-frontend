@@ -5,6 +5,7 @@ import { useTheme } from "@/components/ThemeProvider";
 export default function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const label = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  const actionLabel = theme === "dark" ? "Light" : "Dark";
 
   return (
     <button
@@ -13,20 +14,22 @@ export default function ThemeToggle() {
       title={label}
       style={{
         position: "fixed",
-        top: 16,
-        right: 84,
+        right: 20,
+        bottom: 20,
         zIndex: 1001,
-        width: 46,
-        height: 46,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 14px",
         borderRadius: 999,
         border: "1px solid var(--border-2)",
         background: "color-mix(in srgb, var(--bg-2) 88%, transparent)",
         backdropFilter: "blur(16px)",
         color: "var(--text)",
         cursor: "pointer",
-        display: "grid",
-        placeItems: "center",
         boxShadow: "0 10px 35px rgba(0,0,0,0.18)",
+        fontSize: 13,
+        fontWeight: 600,
       }}
     >
       <span
@@ -43,6 +46,7 @@ export default function ThemeToggle() {
       >
         {theme === "dark" ? "☀" : "☾"}
       </span>
+      <span>{actionLabel}</span>
     </button>
   );
 }
