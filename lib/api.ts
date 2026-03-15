@@ -89,6 +89,15 @@ export const setStoredUser = (user: Record<string, unknown>) => {
   }
 }
 
+export const normalizePlan = (plan: unknown) => {
+  if (typeof plan !== 'string') return 'free'
+
+  const normalized = plan.trim().toLowerCase()
+  return ['free', 'starter', 'pro', 'business', 'enterprise'].includes(normalized)
+    ? normalized
+    : 'free'
+}
+
 // ─── Error message extractor ──────────────────────────────────────────────────
 // Axios wraps backend errors inside err.response.data
 // FastAPI validation errors (422) come as:

@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, getUser, logout, getErrorMessage, refreshCurrentUser } from '@/lib/api'
+import { api, getUser, logout, getErrorMessage, normalizePlan, refreshCurrentUser } from '@/lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -521,7 +521,7 @@ export default function SchedulesPage() {
   }
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const plan    = user?.plan ?? 'free'
+  const plan    = normalizePlan(user?.plan)
   const limit   = PLAN_LIMITS[plan] ?? 0
   const isFree  = plan === 'free'
   const atLimit = schedules.length >= limit && !isFree
