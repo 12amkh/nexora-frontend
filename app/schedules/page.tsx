@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, getUser, logout, getErrorMessage } from '@/lib/api'
+import { api, getUser, logout, getErrorMessage, refreshCurrentUser } from '@/lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -170,10 +170,27 @@ export default function SchedulesPage() {
 
   // ── Load on mount ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!localStorage.getItem('token')) { router.push('/login'); return }
-    const u = getUser()
-    setUser(u)
-    loadData(true)
+    const init = async () => {
+      if (!localStorage.getItem('token')) { router.push('/login'); return }
+
+      const cachedUser = getUser()
+      if (cachedUser) {
+        setUser(cachedUser)
+      }
+
+      try {
+        const freshUser = await refreshCurrentUser()
+        if (freshUser) {
+          setUser(freshUser)
+        }
+      } catch {
+        // Keep cached user data if refresh fails.
+      }
+
+      loadData(true)
+    }
+
+    init()
 
     return () => {
       Object.values(pollIntervals.current).forEach(clearInterval)

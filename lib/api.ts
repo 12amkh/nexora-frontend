@@ -44,6 +44,20 @@ export const getUser = () => {
   return u ? JSON.parse(u) : null
 }
 
+export const refreshCurrentUser = async () => {
+  if (typeof window === 'undefined') return null
+
+  const token = localStorage.getItem('token')
+  if (!token) return getUser()
+
+  const { data } = await api.get('/users/me', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+
+  localStorage.setItem('user', JSON.stringify(data))
+  return data
+}
+
 export const logout = () => {
   if (typeof window === 'undefined') return
   localStorage.removeItem('token')

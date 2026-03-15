@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, getErrorMessage, getUser, logout } from "@/lib/api";
+import { api, getErrorMessage, getUser, logout, refreshCurrentUser } from "@/lib/api";
 import Sidebar from "@/components/Sidebar";
 import AgentCard from "@/components/AgentCard";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -39,12 +39,28 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function init() {
-      const userData = await getUser();
+      const cachedUser = getUser();
+      if (!cachedUser) {
+        router.push("/login");
+        return;
+      }
+      setUser(cachedUser);
+
+      let userData = cachedUser;
+      try {
+        const freshUser = await refreshCurrentUser();
+        if (freshUser) {
+          userData = freshUser;
+          setUser(freshUser);
+        }
+      } catch {
+        // Non-fatal: keep rendering with cached user data.
+      }
+
       if (!userData) {
         router.push("/login");
         return;
       }
-      setUser(userData);
 
       try {
         const res = await api.get("/agents/list?limit=50");

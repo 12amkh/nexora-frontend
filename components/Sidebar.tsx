@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { getUser, logout } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { getUser, logout, refreshCurrentUser } from "@/lib/api";
 
 const PLAN_COLORS: Record<string, string> = {
   free: "#8888a0",
@@ -21,8 +22,26 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const user = getUser();
+  const [user, setUser] = useState<{ email?: string; name?: string; plan?: string } | null>(() => getUser());
   const plan = user?.plan ?? "free";
+
+  useEffect(() => {
+    let active = true;
+
+    refreshCurrentUser()
+      .then((nextUser) => {
+        if (active && nextUser) {
+          setUser(nextUser);
+        }
+      })
+      .catch(() => {
+        // Keep cached user data if the refresh fails.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <aside

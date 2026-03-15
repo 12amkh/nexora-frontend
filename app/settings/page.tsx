@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, getUser, logout, getErrorMessage } from '@/lib/api'
+import { api, getUser, logout, getErrorMessage, refreshCurrentUser } from '@/lib/api'
 
 const PLAN_COLORS: Record<string, string> = {
   free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b',
@@ -32,11 +32,29 @@ export default function SettingsPage() {
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
-    if (!localStorage.getItem('token')) { router.push('/login'); return }
-    const u = getUser()
-    setUser(u)
-    if (u?.name) setNameInput(u.name)
-    fetchStats()
+    const init = async () => {
+      if (!localStorage.getItem('token')) { router.push('/login'); return }
+
+      const cachedUser = getUser()
+      if (cachedUser) {
+        setUser(cachedUser)
+        if (cachedUser.name) setNameInput(cachedUser.name)
+      }
+
+      try {
+        const freshUser = await refreshCurrentUser()
+        if (freshUser) {
+          setUser(freshUser)
+          setNameInput(freshUser.name ?? '')
+        }
+      } catch {
+        // Keep cached user data if refresh fails.
+      }
+
+      fetchStats()
+    }
+
+    init()
   }, [])
 
   const fetchStats = async () => {
