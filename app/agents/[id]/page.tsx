@@ -8,6 +8,21 @@ import { api, getErrorMessage, getToken } from '@/lib/api'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+const QUICK_ACTIONS = [
+  {
+    label: 'Get AI Trends',
+    prompt: 'Give me the most important AI trends right now, what is driving them, and what to watch next.',
+  },
+  {
+    label: 'Market Opportunities',
+    prompt: 'Analyze current market opportunities in this space and highlight the strongest gaps, demand signals, and business angles.',
+  },
+  {
+    label: 'Startup Ideas',
+    prompt: 'Generate strong startup ideas based on current trends, unmet needs, and practical opportunities I could explore.',
+  },
+]
+
 interface Message {
   role: 'user' | 'assistant'
   content: string
@@ -100,13 +115,15 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   }
 
-  const sendMessage = async () => {
-    if (!input.trim() || streaming) return
+  const sendMessage = async (presetMessage?: string) => {
+    const nextMessage = presetMessage ?? input
+
+    if (!nextMessage.trim() || streaming) return
 
     setError('')
     setUpgradeMessage('')
 
-    const userMessage = input.trim()
+    const userMessage = nextMessage.trim()
     setInput('')
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
     setStreaming(true)
@@ -181,6 +198,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       setStreaming(false)
       setReportsLoaded(false)
     }
+  }
+
+  const runQuickAction = async (prompt: string) => {
+    if (activeTab !== 'chat') {
+      setActiveTab('chat')
+    }
+    await sendMessage(prompt)
   }
 
   const handleDelete = async () => {
@@ -288,6 +312,27 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       {activeTab === 'chat' ? (
         <>
           <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '900px', width: '100%', margin: '0 auto', alignSelf: 'center' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.25rem' }}>
+              {QUICK_ACTIONS.map(action => (
+                <button
+                  key={action.label}
+                  onClick={() => runQuickAction(action.prompt)}
+                  disabled={streaming}
+                  style={{
+                    background: 'var(--bg-2)',
+                    color: streaming ? 'var(--text-3)' : 'var(--text)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '999px',
+                    padding: '0.6rem 0.95rem',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: streaming ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
             {messages.length === 0 && agent && (
               <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '3rem 1rem', fontSize: '0.9rem' }}>
                 {agent.config?.welcome_message || `Hi! I'm ${agent.name}. How can I help?`}
@@ -333,7 +378,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               style={{ flex: 1, background: 'var(--bg-3)', border: '1px solid var(--border-2)', borderRadius: '10px', padding: '0.75rem 1rem', color: 'var(--text)', fontSize: '0.9rem', outline: 'none', resize: 'none' }}
             />
             <button
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               disabled={streaming || !input.trim()}
               style={{ background: streaming ? 'var(--bg-3)' : 'var(--accent)', color: streaming ? 'var(--text-3)' : '#fff', border: 'none', borderRadius: '10px', padding: '0 1.25rem', cursor: streaming ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '0.9rem' }}
             >
