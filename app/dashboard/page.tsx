@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, getUser, logout } from "@/lib/api";
+import { api, getErrorMessage, getUser, logout } from "@/lib/api";
 import Sidebar from "@/components/Sidebar";
 import AgentCard from "@/components/AgentCard";
 import UsageStats from "@/components/UsageStats";
@@ -12,7 +12,7 @@ interface Agent {
   id: number;
   name: string;
   description: string;
-  user_id: number;
+  user_id?: number;
   config?: {
     agent_type?: string;
     tone?: string;
@@ -32,6 +32,8 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingAgentId, setDeletingAgentId] = useState<number | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function init() {
@@ -47,6 +49,7 @@ export default function Dashboard() {
         setAgents(Array.isArray(res.data) ? res.data : []);
       } catch (error) {
         console.error("Failed to fetch agents:", error);
+        setError("Failed to load agents.");
       } finally {
         setLoading(false);
       }
@@ -58,6 +61,28 @@ export default function Dashboard() {
   const handleLogout = () => {
     logout();
     router.push("/login");
+  };
+
+  const handleDeleteAgent = async (agent: Agent) => {
+    if (deletingAgentId) return;
+
+    const confirmed = window.confirm(
+      `Delete "${agent.name}"?\n\nThis will also remove its conversation history and cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingAgentId(agent.id);
+    setError("");
+
+    try {
+      await api.delete(`/agents/${agent.id}`);
+      setAgents((prev) => prev.filter((item) => item.id !== agent.id));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setDeletingAgentId(null);
+    }
   };
 
   if (loading || !user) {
@@ -129,6 +154,22 @@ export default function Dashboard() {
 
           <UsageStats />
 
+          {error && (
+            <div
+              style={{
+                marginBottom: 20,
+                background: "rgba(248,113,113,0.1)",
+                border: "1px solid var(--red)",
+                borderRadius: 12,
+                color: "var(--red)",
+                padding: "12px 16px",
+                fontSize: 14,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
           <section>
             <div
               style={{
@@ -193,7 +234,12 @@ export default function Dashboard() {
                 }}
               >
                 {agents.map((agent) => (
-                  <AgentCard key={agent.id} agent={agent} />
+                  <AgentCard
+                    key={agent.id}
+                    agent={agent}
+                    onDelete={handleDeleteAgent}
+                    deleting={deletingAgentId === agent.id}
+                  />
                 ))}
               </div>
             )}

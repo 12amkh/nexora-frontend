@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { MouseEvent } from "react";
 
 interface Agent {
   id: number;
   name: string;
   description: string;
+  user_id?: number;
   config?: {
     agent_type?: string;
     tone?: string;
@@ -13,9 +15,20 @@ interface Agent {
   };
 }
 
-export default function AgentCard({ agent }: { agent: Agent }) {
+interface AgentCardProps {
+  agent: Agent;
+  onDelete?: (agent: Agent) => void | Promise<void>;
+  deleting?: boolean;
+}
+
+export default function AgentCard({ agent, onDelete, deleting = false }: AgentCardProps) {
   const agentType = (agent.config?.agent_type || "custom").replace(/_/g, " ");
   const tone = agent.config?.tone || "professional";
+  const handleDeleteClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onDelete?.(agent);
+  };
 
   return (
     <Link
@@ -61,19 +74,46 @@ export default function AgentCard({ agent }: { agent: Agent }) {
             {agentType}
           </div>
         </div>
-        <span
-          style={{
-            padding: "4px 10px",
-            borderRadius: 999,
-            fontSize: 12,
-            color: "var(--accent)",
-            background: "rgba(108,99,255,0.12)",
-            whiteSpace: "nowrap",
-            textTransform: "capitalize",
-          }}
-        >
-          {tone}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span
+            style={{
+              padding: "4px 10px",
+              borderRadius: 999,
+              fontSize: 12,
+              color: "var(--accent)",
+              background: "rgba(108,99,255,0.12)",
+              whiteSpace: "nowrap",
+              textTransform: "capitalize",
+            }}
+          >
+            {tone}
+          </span>
+          {onDelete && (
+            <button
+              onClick={handleDeleteClick}
+              disabled={deleting}
+              aria-label={`Delete ${agent.name}`}
+              title={`Delete ${agent.name}`}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 999,
+                border: "1px solid var(--border-2)",
+                background: "var(--bg-3)",
+                color: deleting ? "var(--text-3)" : "var(--red)",
+                cursor: deleting ? "not-allowed" : "pointer",
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+                fontSize: 16,
+                fontWeight: 700,
+                lineHeight: 1,
+              }}
+            >
+              {deleting ? "…" : "×"}
+            </button>
+          )}
+        </div>
       </div>
 
       <div

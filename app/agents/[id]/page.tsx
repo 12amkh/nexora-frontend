@@ -4,7 +4,7 @@
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, getToken } from '@/lib/api'
+import { api, getErrorMessage, getToken } from '@/lib/api'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -26,6 +26,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -57,6 +59,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   const sendMessage = async () => {
     if (!input.trim() || streaming) return
+    setError('')
     const userMsg = input.trim()
     setInput('')
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
@@ -110,6 +113,27 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     }
   }
 
+  const handleDelete = async () => {
+    if (!agent || deleting) return
+
+    const confirmed = window.confirm(
+      `Delete "${agent.name}"?\n\nThis will also remove its conversation history and cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    setDeleting(true)
+    setError('')
+
+    try {
+      await api.delete(`/agents/${id}`)
+      router.push('/dashboard')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err))
+      setDeleting(false)
+    }
+  }
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       {/* header */}
@@ -122,14 +146,39 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           </div>
         </div>
         {agent && (
-          <Link
-            href={`/agents/${id}/edit`}
-            style={{ marginLeft: 'auto', color: 'var(--text-3)', border: '1px solid var(--border)', padding: '0.3rem 0.7rem', borderRadius: '6px', fontSize: '0.8rem' }}
-          >
-            Edit
-          </Link>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              style={{
+                color: deleting ? 'var(--text-3)' : 'var(--red)',
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                padding: '0.3rem 0.7rem',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                cursor: deleting ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
+            <Link
+              href={`/agents/${id}/edit`}
+              style={{ color: 'var(--text-3)', border: '1px solid var(--border)', padding: '0.3rem 0.7rem', borderRadius: '6px', fontSize: '0.8rem' }}
+            >
+              Edit
+            </Link>
+          </div>
         )}
       </div>
+
+      {error && (
+        <div style={{ maxWidth: '900px', width: '100%', margin: '1rem auto 0', padding: '0 2rem' }}>
+          <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid var(--red)', borderRadius: '10px', color: 'var(--red)', padding: '0.9rem 1rem', fontSize: '0.9rem' }}>
+            {error}
+          </div>
+        </div>
+      )}
 
       {/* messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '900px', width: '100%', margin: '0 auto', alignSelf: 'center' }}>

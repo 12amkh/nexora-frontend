@@ -7,7 +7,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api } from "@/lib/api";
+import { api, getErrorMessage } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +61,7 @@ export default function EditAgentPage({
   const [agentType, setAgentType] = useState(""); // read-only display badge
   const [loading, setLoading] = useState(true);   // true while fetching agent
   const [saving, setSaving] = useState(false);    // true while PUT is in flight
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
 
   // ── Load agent on mount ──────────────────────────────────────────────────
@@ -158,11 +159,30 @@ export default function EditAgentPage({
       // Success → navigate back to the agent chat page
       router.push(`/agents/${id}`);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to save changes";
-      setError(message);
+      setError(getErrorMessage(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (deleting) return;
+
+    const confirmed = window.confirm(
+      `Delete "${form.name || "this agent"}"?\n\nThis will also remove its conversation history and cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError("");
+
+    try {
+      await api.delete(`/agents/${id}`);
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+      setDeleting(false);
     }
   };
 
@@ -517,43 +537,63 @@ export default function EditAgentPage({
               style={{
                 display: "flex",
                 gap: 12,
-                justifyContent: "flex-end",
+                justifyContent: "space-between",
+                alignItems: "center",
                 paddingBottom: 48, // breathing room at bottom of page
               }}
             >
-              <Link
-                href={`/agents/${id}`}
+              <button
+                onClick={handleDelete}
+                disabled={deleting || saving}
                 style={{
                   padding: "10px 20px",
                   borderRadius: 8,
                   border: "1px solid var(--border-2)",
-                  color: "var(--text-2)",
-                  textDecoration: "none",
+                  background: "transparent",
+                  color: deleting || saving ? "var(--text-3)" : "var(--red)",
                   fontSize: 14,
                   fontWeight: 500,
+                  cursor: deleting || saving ? "not-allowed" : "pointer",
                 }}
               >
-                Cancel
-              </Link>
-
-              <button
-                onClick={handleSave}
-                disabled={saving || !form.name.trim()}
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: 8,
-                  background: saving ? "var(--bg-3)" : "var(--accent)",
-                  border: "none",
-                  color: saving ? "var(--text-2)" : "white",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: saving || !form.name.trim() ? "not-allowed" : "pointer",
-                  transition: "opacity 0.15s",
-                  opacity: !form.name.trim() ? 0.5 : 1,
-                }}
-              >
-                {saving ? "Saving..." : "Save changes"}
+                {deleting ? "Deleting..." : "Delete agent"}
               </button>
+
+              <div style={{ display: "flex", gap: 12 }}>
+                <Link
+                  href={`/agents/${id}`}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border-2)",
+                    color: "var(--text-2)",
+                    textDecoration: "none",
+                    fontSize: 14,
+                    fontWeight: 500,
+                  }}
+                >
+                  Cancel
+                </Link>
+
+                <button
+                  onClick={handleSave}
+                  disabled={saving || deleting || !form.name.trim()}
+                  style={{
+                    padding: "10px 24px",
+                    borderRadius: 8,
+                    background: saving ? "var(--bg-3)" : "var(--accent)",
+                    border: "none",
+                    color: saving ? "var(--text-2)" : "white",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: saving || deleting || !form.name.trim() ? "not-allowed" : "pointer",
+                    transition: "opacity 0.15s",
+                    opacity: !form.name.trim() ? 0.5 : 1,
+                  }}
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
+              </div>
             </div>
 
           </div>
