@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MouseEvent } from "react";
 
 interface Agent {
@@ -22,25 +23,47 @@ interface AgentCardProps {
 }
 
 export default function AgentCard({ agent, onDelete, deleting = false }: AgentCardProps) {
+  const router = useRouter();
   const agentType = (agent.config?.agent_type || "custom").replace(/_/g, " ");
   const tone = agent.config?.tone || "professional";
+  const shortDescription = agent.description
+    ? agent.description.length > 120
+      ? `${agent.description.slice(0, 117).trimEnd()}...`
+      : agent.description
+    : "No description yet. Open this agent to start chatting and customizing it.";
+  const statusLabel = agent.config?.use_web_search ? "Research-ready" : "Knowledge-ready";
+  const capabilityLabel = agent.config?.use_web_search ? "Web search enabled" : "Knowledge only";
+
   const handleDeleteClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
     onDelete?.(agent);
   };
 
+  const handleCardOpen = () => {
+    router.push(`/agents/${agent.id}`);
+  };
+
   return (
-    <Link
-      href={`/agents/${agent.id}`}
+    <div
+      onClick={handleCardOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleCardOpen();
+        }
+      }}
       style={{
         display: "block",
         background: "var(--bg-2)",
         border: "1px solid var(--border)",
-        borderRadius: 16,
-        padding: "20px 22px",
+        borderRadius: 20,
+        padding: "22px",
         color: "inherit",
         textDecoration: "none",
+        cursor: "pointer",
       }}
     >
       <div
@@ -51,14 +74,33 @@ export default function AgentCard({ agent, onDelete, deleting = false }: AgentCa
           gap: 12,
           marginBottom: 16,
         }}
-      >
+        >
         <div style={{ minWidth: 0 }}>
           <div
             style={{
-              fontSize: 18,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "5px 10px",
+              borderRadius: 999,
+              background: "rgba(217,121,85,0.1)",
+              color: "var(--accent)",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 12,
+            }}
+          >
+            {statusLabel}
+          </div>
+          <div
+            style={{
+              fontSize: 20,
               fontWeight: 700,
               color: "var(--text)",
-              marginBottom: 6,
+              marginBottom: 8,
+              letterSpacing: "-0.02em",
             }}
           >
             {agent.name}
@@ -66,7 +108,7 @@ export default function AgentCard({ agent, onDelete, deleting = false }: AgentCa
           <div
             style={{
               fontSize: 12,
-              letterSpacing: "0.18em",
+              letterSpacing: "0.16em",
               textTransform: "uppercase",
               color: "var(--text-3)",
             }}
@@ -77,11 +119,11 @@ export default function AgentCard({ agent, onDelete, deleting = false }: AgentCa
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span
             style={{
-              padding: "4px 10px",
+              padding: "5px 10px",
               borderRadius: 999,
               fontSize: 12,
               color: "var(--accent)",
-              background: "rgba(108,99,255,0.12)",
+              background: "rgba(217,121,85,0.12)",
               whiteSpace: "nowrap",
               textTransform: "capitalize",
             }}
@@ -120,12 +162,52 @@ export default function AgentCard({ agent, onDelete, deleting = false }: AgentCa
         style={{
           color: "var(--text-2)",
           fontSize: 14,
-          lineHeight: 1.6,
+          lineHeight: 1.7,
           minHeight: 72,
-          marginBottom: 16,
+          marginBottom: 18,
         }}
       >
-        {agent.description || "No description yet. Open this agent to start chatting and customizing it."}
+        {shortDescription}
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: 10,
+          marginBottom: 18,
+        }}
+      >
+        <div
+          style={{
+            padding: "10px 12px",
+            borderRadius: 12,
+            background: "var(--bg-3)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+            Type
+          </div>
+          <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 600, textTransform: "capitalize" }}>
+            {agentType}
+          </div>
+        </div>
+        <div
+          style={{
+            padding: "10px 12px",
+            borderRadius: 12,
+            background: "var(--bg-3)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+            Status
+          </div>
+          <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 600 }}>
+            {capabilityLabel}
+          </div>
+        </div>
       </div>
 
       <div
@@ -134,15 +216,62 @@ export default function AgentCard({ agent, onDelete, deleting = false }: AgentCa
           alignItems: "center",
           justifyContent: "space-between",
           gap: 12,
-          fontSize: 13,
-          color: "var(--text-3)",
+          flexWrap: "wrap",
         }}
       >
-        <span>
-          {agent.config?.use_web_search ? "Web search enabled" : "Knowledge only"}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link
+            href={`/agents/${agent.id}`}
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              padding: "9px 14px",
+              borderRadius: 10,
+              background: "var(--accent)",
+              color: "#fff",
+              textDecoration: "none",
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >
+            Open
+          </Link>
+          <Link
+            href={`/agents/${agent.id}/edit`}
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              padding: "9px 14px",
+              borderRadius: 10,
+              background: "var(--bg-3)",
+              border: "1px solid var(--border)",
+              color: "var(--text)",
+              textDecoration: "none",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            Edit
+          </Link>
+          <Link
+            href={`/agents/${agent.id}`}
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              padding: "9px 14px",
+              borderRadius: 10,
+              background: "transparent",
+              border: "1px solid var(--border)",
+              color: "var(--text-2)",
+              textDecoration: "none",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            Run
+          </Link>
+        </div>
+        <span style={{ fontSize: 12, color: "var(--text-3)" }}>
+          Ready for follow-up chat
         </span>
-        <span>Open chat</span>
       </div>
-    </Link>
+    </div>
   );
 }
