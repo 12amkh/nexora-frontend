@@ -106,16 +106,7 @@ export default function Dashboard() {
     }
   };
 
-  if (loading || !user) {
-    return (
-      <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
-        <Sidebar />
-        <main style={{ marginLeft: 220, flex: 1, padding: "40px 48px", color: "var(--text)" }}>Loading...</main>
-      </div>
-    );
-  }
-
-  const planLabel = formatPlanName(user.plan);
+  const planLabel = formatPlanName(user?.plan || "free");
   const agentTypes = useMemo(() => {
     const types = new Set<string>();
     agents.forEach((agent) => {
@@ -140,6 +131,15 @@ export default function Dashboard() {
         return b.id - a.id;
       });
   }, [agents, searchQuery, selectedType, sortOrder]);
+
+  if (loading || !user) {
+    return (
+      <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
+        <Sidebar />
+        <main style={{ marginLeft: 220, flex: 1, padding: "40px 48px", color: "var(--text)" }}>Loading...</main>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
