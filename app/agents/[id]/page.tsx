@@ -3,9 +3,11 @@
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx'
+import { jsPDF } from 'jspdf'
 
 import { api, getErrorMessage, getToken } from '@/lib/api'
-import RichContent from '@/components/RichContent'
+import RichContent, { parseRichContent } from '@/components/RichContent'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -44,6 +46,17 @@ interface Agent {
     agent_type?: string
     welcome_message?: string
   }
+}
+
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 function formatTimeLabel(value?: string): string {
@@ -95,6 +108,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [activeTab, setActiveTab] = useState<'chat' | 'reports'>('chat')
   const [reportsLoading, setReportsLoading] = useState(false)
   const [reportsLoaded, setReportsLoaded] = useState(false)
+  const [previewReport, setPreviewReport] = useState<Report | null>(null)
   const [error, setError] = useState('')
   const [upgradeMessage, setUpgradeMessage] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -155,6 +169,152 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     } finally {
       setReportsLoading(false)
     }
+  }
+
+  const sanitizeInlineText = (text: string) => text.replace(/\*\*([^*]+)\*\*/g, '$1')
+
+  const downloadReportPdf = (report: Report) => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const margin = 52
+    const lineWidth = pageWidth - margin * 2
+    let cursorY = 56
+
+    const ensureSpace = (height: number) => {
+      if (cursorY + height <= pageHeight - margin) return
+      doc.addPage()
+      cursorY = 56
+    }
+
+    doc.setTextColor(19, 19, 20)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(18)
+    doc.text(report.title, margin, cursorY)
+    cursorY += 18
+
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(102, 102, 108)
+    doc.setFontSize(10)
+    doc.text(new Date(report.created_at).toLocaleString(), margin, cursorY)
+    cursorY += 24
+
+    const blocks = parseRichContent(report.content)
+
+    blocks.forEach((block) => {
+      if (block.type === 'heading') {
+        ensureSpace(24)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(19, 19, 20)
+        doc.setFontSize(13)
+        doc.text(block.content, margin, cursorY)
+        cursorY += 22
+        return
+      }
+
+      if (block.type === 'paragraph') {
+        const lines = doc.splitTextToSize(sanitizeInlineText(block.content), lineWidth)
+        ensureSpace(lines.length * 16)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(54, 54, 61)
+        doc.setFontSize(11)
+        doc.text(lines, margin, cursorY)
+        cursorY += lines.length * 16 + 6
+        return
+      }
+
+      if (block.type === 'bullet-list') {
+        block.items.forEach((item) => {
+          const lines = doc.splitTextToSize(`• ${sanitizeInlineText(item)}`, lineWidth)
+          ensureSpace(lines.length * 16)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(54, 54, 61)
+          doc.setFontSize(11)
+          doc.text(lines, margin, cursorY)
+          cursorY += lines.length * 16 + 4
+        })
+        cursorY += 4
+        return
+      }
+
+      block.items.forEach((item, index) => {
+        const lines = doc.splitTextToSize(`${index + 1}. ${sanitizeInlineText(item)}`, lineWidth)
+        ensureSpace(lines.length * 16)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(54, 54, 61)
+        doc.setFontSize(11)
+        doc.text(lines, margin, cursorY)
+        cursorY += lines.length * 16 + 4
+      })
+      cursorY += 4
+    })
+
+    doc.save(`${report.title.replace(/[^\w\s-]+/g, '').trim() || 'report'}.pdf`)
+  }
+
+  const downloadReportDocx = async (report: Report) => {
+    const blocks = parseRichContent(report.content)
+    const paragraphs: Paragraph[] = [
+      new Paragraph({
+        heading: HeadingLevel.TITLE,
+        children: [new TextRun({ text: report.title, bold: true })],
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: new Date(report.created_at).toLocaleString(), color: '66666c' })],
+      }),
+    ]
+
+    blocks.forEach((block) => {
+      if (block.type === 'heading') {
+        paragraphs.push(
+          new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: sanitizeInlineText(block.content), bold: true })],
+          })
+        )
+        return
+      }
+
+      if (block.type === 'paragraph') {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: sanitizeInlineText(block.content) })],
+          })
+        )
+        return
+      }
+
+      if (block.type === 'bullet-list') {
+        block.items.forEach((item) => {
+          paragraphs.push(
+            new Paragraph({
+              bullet: { level: 0 },
+              children: [new TextRun({ text: sanitizeInlineText(item) })],
+            })
+          )
+        })
+        return
+      }
+
+      block.items.forEach((item, index) => {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun({ text: `${index + 1}. ${sanitizeInlineText(item)}` })],
+          })
+        )
+      })
+    })
+
+    const document = new Document({
+      sections: [
+        {
+          children: paragraphs,
+        },
+      ],
+    })
+
+    const blob = await Packer.toBlob(document)
+    triggerBlobDownload(blob, `${report.title.replace(/[^\w\s-]+/g, '').trim() || 'report'}.docx`)
   }
 
   const sendMessage = async (presetMessage?: string) => {
@@ -330,6 +490,63 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             <Link href="/dashboard/upgrade" style={{ marginLeft: 8, color: 'var(--accent)', fontWeight: 700, textDecoration: 'underline' }}>
               Upgrade plan
             </Link>
+          </div>
+        </div>
+      )}
+
+      {previewReport && (
+        <div
+          onClick={() => setPreviewReport(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2rem',
+            zIndex: 50,
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: 'min(920px, 100%)',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              background: 'var(--bg-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 20,
+              padding: '1.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <div style={{ color: 'var(--text)', fontSize: '1.35rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                  {previewReport.title}
+                </div>
+                <div style={{ color: 'var(--text-3)', fontSize: '0.84rem' }}>
+                  {new Date(previewReport.created_at).toLocaleString()}
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewReport(null)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-3)',
+                  color: 'var(--text)',
+                  cursor: 'pointer',
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.2rem' }}>
+              <RichContent content={previewReport.content} />
+            </div>
           </div>
         </div>
       )}
@@ -614,9 +831,58 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {reports.map(report => (
                 <div key={report.id} style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.1rem 1.2rem' }}>
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: '1rem', marginBottom: '0.2rem' }}>{report.title}</div>
-                    <div style={{ color: 'var(--text-3)', fontSize: '0.8rem' }}>{new Date(report.created_at).toLocaleString()}</div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
+                    <div>
+                      <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: '1rem', marginBottom: '0.2rem' }}>{report.title}</div>
+                      <div style={{ color: 'var(--text-3)', fontSize: '0.8rem' }}>{new Date(report.created_at).toLocaleString()}</div>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => setPreviewReport(report)}
+                        style={{
+                          background: 'var(--bg-3)',
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 10,
+                          padding: '0.55rem 0.8rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        onClick={() => downloadReportPdf(report)}
+                        style={{
+                          background: 'var(--bg-3)',
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 10,
+                          padding: '0.55rem 0.8rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        PDF
+                      </button>
+                      <button
+                        onClick={() => downloadReportDocx(report)}
+                        style={{
+                          background: 'var(--bg-3)',
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 10,
+                          padding: '0.55rem 0.8rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        DOCX
+                      </button>
+                    </div>
                   </div>
                   <div style={{ color: 'var(--text-2)', fontSize: '0.92rem', lineHeight: 1.7, wordBreak: 'break-word' }}>
                     <RichContent content={report.content} />

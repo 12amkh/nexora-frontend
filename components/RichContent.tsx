@@ -2,7 +2,7 @@
 
 import { Fragment } from 'react'
 
-type RenderBlock =
+export type RenderBlock =
   | { type: 'heading'; content: string }
   | { type: 'paragraph'; content: string }
   | { type: 'bullet-list'; items: string[]; isSources?: boolean }
@@ -28,7 +28,7 @@ function stripListMarker(line: string): string {
   return line.replace(/^[-*•]\s+/, '').replace(/^\d+\.\s+/, '').trim()
 }
 
-function parseContent(content: string): RenderBlock[] {
+export function parseRichContent(content: string): RenderBlock[] {
   const lines = content
     .split('\n')
     .map(line => line.replace(/\t/g, '  ').trimEnd())
@@ -153,7 +153,7 @@ function renderFormattedText(text: string) {
 }
 
 export default function RichContent({ content }: { content: string }) {
-  const blocks = parseContent(content)
+  const blocks = parseRichContent(content)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
