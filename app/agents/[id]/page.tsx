@@ -430,8 +430,81 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
               </div>
             )}
             {messages.length === 0 && agent && (
-              <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '3rem 1rem', fontSize: '0.9rem' }}>
-                {agent.config?.welcome_message || `Hi! I'm ${agent.name}. How can I help?`}
+              <div
+                style={{
+                  background: 'var(--bg-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 20,
+                  padding: '2rem 1.4rem',
+                  textAlign: 'left',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 12px',
+                    borderRadius: 999,
+                    background: 'rgba(217,121,85,0.1)',
+                    color: 'var(--accent)',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  First Run
+                </div>
+                <h2 style={{ color: 'var(--text)', fontSize: '1.5rem', lineHeight: 1.15, letterSpacing: '-0.03em', margin: '0 0 0.75rem' }}>
+                  Start the conversation with a quick action or your own prompt
+                </h2>
+                <p style={{ color: 'var(--text-2)', margin: '0 0 1.1rem', fontSize: '0.96rem', lineHeight: 1.75, maxWidth: 680 }}>
+                  {agent.config?.welcome_message || `Hi! I'm ${agent.name}. How can I help?`}
+                </p>
+                <div style={{ display: 'grid', gap: '0.7rem', marginBottom: '1.2rem' }}>
+                  {[
+                    'Click a quick action above for an instant first result.',
+                    'Ask a direct question, request research, or generate ideas in the composer below.',
+                    'Keep chatting with follow-up prompts to build on recent context.',
+                  ].map(item => (
+                    <div
+                      key={item}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.65rem',
+                        color: 'var(--text-2)',
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      <span style={{ color: 'var(--accent)', fontWeight: 700 }}>•</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.7rem' }}>
+                  {QUICK_ACTIONS.map(action => (
+                    <button
+                      key={`empty-${action.label}`}
+                      onClick={() => runQuickAction(action.prompt)}
+                      disabled={streaming}
+                      style={{
+                        background: 'var(--bg-3)',
+                        color: streaming ? 'var(--text-3)' : 'var(--text)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 999,
+                        padding: '0.7rem 1rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: streaming ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {messages.map((message, index) => (
@@ -515,8 +588,27 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           {reportsLoading ? (
             <div style={{ color: 'var(--text-3)', fontSize: '0.95rem', padding: '1rem 0' }}>Loading reports...</div>
           ) : reports.length === 0 ? (
-            <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.2rem', color: 'var(--text-2)', lineHeight: 1.6 }}>
-              No saved reports yet. Every generated agent response will appear here once the agent starts working.
+            <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.4rem 1.2rem', color: 'var(--text-2)', lineHeight: 1.7 }}>
+              <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: '1rem', marginBottom: '0.4rem' }}>
+                No saved reports yet
+              </div>
+              <div style={{ marginBottom: '0.9rem' }}>
+                Reports appear here when this agent produces deeper research, summaries, or structured analysis. Casual chat stays in Chat only.
+              </div>
+              <button
+                onClick={() => setActiveTab('chat')}
+                style={{
+                  background: 'var(--bg-3)',
+                  color: 'var(--text)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  padding: '0.7rem 1rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Go to chat
+              </button>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

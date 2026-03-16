@@ -246,19 +246,89 @@ export default function Dashboard() {
                   background: "var(--bg-2)",
                   border: "1px solid var(--border)",
                   borderRadius: 16,
-                  padding: "48px 24px",
-                  textAlign: "center",
+                  padding: "36px 32px",
                 }}
               >
-                <p style={{ color: "var(--text-2)", margin: "0 0 16px", fontSize: 16 }}>
-                  No agents yet.
-                </p>
-                <Link
-                  href="/agents/new"
-                  style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
-                >
-                  Create your first agent →
-                </Link>
+                <div style={{ maxWidth: 720 }}>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      background: "rgba(217,121,85,0.1)",
+                      color: "var(--accent)",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      marginBottom: 18,
+                    }}
+                  >
+                    First Step
+                  </div>
+                  <h3
+                    style={{
+                      color: "var(--text)",
+                      fontSize: 28,
+                      lineHeight: 1.15,
+                      letterSpacing: "-0.03em",
+                      margin: "0 0 14px",
+                    }}
+                  >
+                    Create your first agent and start with a template
+                  </h3>
+                  <p style={{ color: "var(--text-2)", margin: "0 0 22px", fontSize: 16, lineHeight: 1.7, maxWidth: 620 }}>
+                    Agents are the core of Nexora. Pick a ready-made template like AI Trend Monitor or Competitor Analyzer, customize it in a minute, then open chat and use quick actions to generate your first result fast.
+                  </p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 22 }}>
+                    {["Choose a template", "Customize the agent", "Run a first prompt"].map((item) => (
+                      <div
+                        key={item}
+                        style={{
+                          padding: "10px 14px",
+                          borderRadius: 12,
+                          background: "var(--bg-3)",
+                          border: "1px solid var(--border)",
+                          color: "var(--text-2)",
+                          fontSize: 14,
+                        }}
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                    <Link
+                      href="/agents/new"
+                      style={{
+                        padding: "12px 18px",
+                        background: "var(--accent)",
+                        color: "#fff",
+                        borderRadius: 12,
+                        fontWeight: 700,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Create your first agent
+                    </Link>
+                    <Link
+                      href="/agents/new"
+                      style={{
+                        padding: "12px 18px",
+                        background: "var(--bg-3)",
+                        color: "var(--text)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 12,
+                        fontWeight: 600,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Browse templates
+                    </Link>
+                  </div>
+                </div>
               </div>
             ) : (
               <div
