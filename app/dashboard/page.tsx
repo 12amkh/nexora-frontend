@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, formatPlanName, getErrorMessage, getUser, logout, refreshCurrentUser } from "@/lib/api";
@@ -32,6 +32,9 @@ export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState("all");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [loading, setLoading] = useState(true);
   const [deletingAgentId, setDeletingAgentId] = useState<number | null>(null);
   const [agentPendingDelete, setAgentPendingDelete] = useState<Agent | null>(null);
@@ -113,6 +116,30 @@ export default function Dashboard() {
   }
 
   const planLabel = formatPlanName(user.plan);
+  const agentTypes = useMemo(() => {
+    const types = new Set<string>();
+    agents.forEach((agent) => {
+      types.add(agent.config?.agent_type || "custom");
+    });
+    return ["all", ...Array.from(types).sort()];
+  }, [agents]);
+
+  const visibleAgents = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return [...agents]
+      .filter((agent) => {
+        const nameMatch = agent.name.toLowerCase().includes(normalizedQuery);
+        const typeMatch = selectedType === "all" || (agent.config?.agent_type || "custom") === selectedType;
+        return (!normalizedQuery || nameMatch) && typeMatch;
+      })
+      .sort((a, b) => {
+        if (sortOrder === "oldest") {
+          return a.id - b.id;
+        }
+        return b.id - a.id;
+      });
+  }, [agents, searchQuery, selectedType, sortOrder]);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
@@ -235,10 +262,109 @@ export default function Dashboard() {
                   fontWeight: 600,
                   textDecoration: "none",
                 }}
-              >
-                Create Agent
-              </Link>
-            </div>
+                >
+                  Create Agent
+                </Link>
+              </div>
+
+              {agents.length > 0 && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1.3fr) minmax(180px, 0.75fr) minmax(180px, 0.75fr)",
+                    gap: 12,
+                    marginBottom: 20,
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "var(--bg-2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 14,
+                      padding: "10px 14px",
+                    }}
+                  >
+                    <div style={{ color: "var(--text-3)", fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                      Search
+                    </div>
+                    <input
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Find an agent by name"
+                      style={{
+                        width: "100%",
+                        background: "transparent",
+                        border: "none",
+                        outline: "none",
+                        color: "var(--text)",
+                        fontSize: 14,
+                      }}
+                    />
+                  </div>
+
+                  <label
+                    style={{
+                      background: "var(--bg-2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 14,
+                      padding: "10px 14px",
+                      display: "block",
+                    }}
+                  >
+                    <div style={{ color: "var(--text-3)", fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                      Filter by type
+                    </div>
+                    <select
+                      value={selectedType}
+                      onChange={(event) => setSelectedType(event.target.value)}
+                      style={{
+                        width: "100%",
+                        background: "transparent",
+                        border: "none",
+                        outline: "none",
+                        color: "var(--text)",
+                        fontSize: 14,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {agentTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type === "all" ? "All types" : type.replace(/_/g, " ")}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label
+                    style={{
+                      background: "var(--bg-2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 14,
+                      padding: "10px 14px",
+                      display: "block",
+                    }}
+                  >
+                    <div style={{ color: "var(--text-3)", fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                      Sort
+                    </div>
+                    <select
+                      value={sortOrder}
+                      onChange={(event) => setSortOrder(event.target.value as "newest" | "oldest")}
+                      style={{
+                        width: "100%",
+                        background: "transparent",
+                        border: "none",
+                        outline: "none",
+                        color: "var(--text)",
+                        fontSize: 14,
+                      }}
+                    >
+                      <option value="newest">Newest first</option>
+                      <option value="oldest">Oldest first</option>
+                    </select>
+                  </label>
+                </div>
+              )}
 
             {agents.length === 0 ? (
               <div
@@ -331,22 +457,95 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-                  gap: 20,
-                }}
-              >
-                {agents.map((agent) => (
-                  <AgentCard
-                    key={agent.id}
-                    agent={agent}
-                    onDelete={handleDeleteAgent}
-                    deleting={deletingAgentId === agent.id}
-                  />
-                ))}
-              </div>
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    marginBottom: 18,
+                    color: "var(--text-3)",
+                    fontSize: 13,
+                  }}
+                >
+                  <span>
+                    Showing {visibleAgents.length} of {agents.length} agents
+                  </span>
+                  {(searchQuery || selectedType !== "all" || sortOrder !== "newest") && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedType("all");
+                        setSortOrder("newest");
+                      }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--accent)",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Reset filters
+                    </button>
+                  )}
+                </div>
+
+                {visibleAgents.length === 0 ? (
+                  <div
+                    style={{
+                      background: "var(--bg-2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 16,
+                      padding: "24px 22px",
+                    }}
+                  >
+                    <div style={{ color: "var(--text)", fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+                      No agents match these filters
+                    </div>
+                    <div style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
+                      Try another name, switch the type filter, or reset sorting to see your full agent list again.
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedType("all");
+                        setSortOrder("newest");
+                      }}
+                      style={{
+                        background: "var(--bg-3)",
+                        border: "1px solid var(--border)",
+                        color: "var(--text)",
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Clear search and filters
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                      gap: 20,
+                    }}
+                  >
+                    {visibleAgents.map((agent) => (
+                      <AgentCard
+                        key={agent.id}
+                        agent={agent}
+                        onDelete={handleDeleteAgent}
+                        deleting={deletingAgentId === agent.id}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </section>
         </div>
