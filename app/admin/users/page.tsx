@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, getUser, logout } from "@/lib/api";
+import { api, getUser } from "@/lib/api";
 import Sidebar from "@/components/Sidebar";
 
 interface AdminUser {
@@ -36,8 +36,14 @@ export default function AdminUsers() {
 
       try {
         await loadUsers();
-      } catch (error: any) {
-        if (error.response?.status === 403) {
+      } catch (error: unknown) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { status?: number } }).response?.status === "number" &&
+          (error as { response?: { status?: number } }).response?.status === 403
+        ) {
           router.push("/dashboard");
         }
       } finally {

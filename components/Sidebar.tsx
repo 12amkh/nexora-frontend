@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { formatPlanName, getUser, logout, normalizePlan, refreshCurrentUser } from "@/lib/api";
+import { formatPlanName, getUser, logout, normalizePlan, refreshCurrentUser, type CurrentUser } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
 import { getThemeDefinition } from "@/lib/themes";
 
@@ -24,10 +24,11 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [user, setUser] = useState<{ email?: string; name?: string; plan?: string } | null>(() => getUser());
+  const [user, setUser] = useState<CurrentUser | null>(() => getUser());
   const plan = normalizePlan(user?.plan);
   const { themeMode, themeFamily, toggleTheme } = useTheme();
   const themeName = getThemeDefinition(themeFamily).name;
+  const navItems = NAV_ITEMS.filter((item) => item.href !== "/admin" || user?.is_admin === true);
 
   useEffect(() => {
     let active = true;
@@ -79,7 +80,7 @@ export default function Sidebar() {
         Nexora
       </Link>
 
-      {NAV_ITEMS.map((item) => {
+      {navItems.map((item) => {
         const isActive =
           pathname === item.href ||
           (item.href !== "/dashboard" && pathname.startsWith(item.href));

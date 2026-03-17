@@ -14,6 +14,39 @@ const USER_STORAGE_KEY = 'user'
 const THEME_MODE_STORAGE_KEY = 'nexora_theme_mode'
 const THEME_FAMILY_STORAGE_KEY = 'nexora_theme_family'
 
+export interface CurrentUser {
+  id: number
+  name: string
+  email: string
+  plan: string
+  is_admin: boolean
+  theme: ThemeMode
+  theme_family: ThemeFamily
+  created_at: string
+}
+
+const normalizeCurrentUser = (value: unknown): CurrentUser | null => {
+  if (!value || typeof value !== 'object') return null
+
+  const candidate = value as Record<string, unknown>
+  const id = typeof candidate.id === 'number' ? candidate.id : Number(candidate.id)
+
+  if (!Number.isFinite(id) || typeof candidate.email !== 'string') {
+    return null
+  }
+
+  return {
+    id,
+    name: typeof candidate.name === 'string' ? candidate.name : '',
+    email: candidate.email,
+    plan: typeof candidate.plan === 'string' ? candidate.plan : 'free',
+    is_admin: candidate.is_admin === true,
+    theme: normalizeThemeMode(candidate.theme ?? DEFAULT_THEME_MODE),
+    theme_family: normalizeThemeFamily(candidate.theme_family ?? DEFAULT_THEME_FAMILY),
+    created_at: typeof candidate.created_at === 'string' ? candidate.created_at : '',
+  }
+}
+
 export const api = axios.create({
   baseURL: API_URL,
 })
@@ -52,25 +85,36 @@ export const getToken = () => {
 export const getUser = () => {
   if (typeof window === 'undefined') return null
   const u = localStorage.getItem(USER_STORAGE_KEY)
-  return u ? JSON.parse(u) : null
+  if (!u) return null
+
+  try {
+    return normalizeCurrentUser(JSON.parse(u))
+  } catch {
+    return null
+  }
 }
 
-export const refreshCurrentUser = async () => {
+export const refreshCurrentUser = async (): Promise<CurrentUser | null> => {
   if (typeof window === 'undefined') return null
 
   const token = localStorage.getItem('token')
   if (!token) return getUser()
 
-  const { data } = await api.get('/users/me', {
+  const { data } = await api.get<CurrentUser>('/users/me', {
     headers: { Authorization: `Bearer ${token}` },
   })
 
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data))
+  const normalizedUser = normalizeCurrentUser(data)
+  if (!normalizedUser) {
+    return getUser()
+  }
+
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(normalizedUser))
   setStoredThemePreferences({
-    theme: data?.theme,
-    theme_family: data?.theme_family,
+    theme: normalizedUser.theme,
+    theme_family: normalizedUser.theme_family,
   })
-  return data
+  return normalizedUser
 }
 
 export const logout = () => {
@@ -109,12 +153,15 @@ export const setStoredThemePreferences = (preferences: {
   setStoredThemeFamily(normalizeThemeFamily(preferences.theme_family ?? DEFAULT_THEME_FAMILY))
 }
 
-export const setStoredUser = (user: Record<string, unknown>) => {
+export const setStoredUser = (user: CurrentUser | Record<string, unknown>) => {
   if (typeof window === 'undefined') return
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
+  const normalizedUser = normalizeCurrentUser(user)
+  if (!normalizedUser) return
+
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(normalizedUser))
   setStoredThemePreferences({
-    theme: user?.theme,
-    theme_family: user?.theme_family,
+    theme: normalizedUser.theme,
+    theme_family: normalizedUser.theme_family,
   })
 }
 

@@ -21,15 +21,8 @@ interface PlatformStats {
   new_users_this_week: number;
 }
 
-interface User {
-  id: number;
-  name: string;
-  email: string;
-}
-
 export default function AdminDashboard() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,14 +33,19 @@ export default function AdminDashboard() {
         router.push("/login");
         return;
       }
-      setCurrentUser(user);
 
       // Try to fetch admin stats
       try {
         const res = await api.get("/admin/stats");
         setStats(res.data.data);
-      } catch (error: any) {
-        if (error.response?.status === 403) {
+      } catch (error: unknown) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof (error as { response?: { status?: number } }).response?.status === "number" &&
+          (error as { response?: { status?: number } }).response?.status === 403
+        ) {
           // Not an admin
           router.push("/dashboard");
         }
