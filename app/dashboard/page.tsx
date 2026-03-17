@@ -1014,38 +1014,48 @@ export default function Dashboard() {
                 onClick={() => setRecentInsightsOpen((current) => !current)}
                 style={{
                   display: "flex",
-                  alignItems: "center",
-                  gap: 12,
+                  alignItems: "flex-start",
+                  gap: 14,
                   border: "none",
                   background: "transparent",
-                  padding: 0,
+                  padding: "2px 0",
                   cursor: "pointer",
                   textAlign: "left",
+                  minWidth: 0,
+                  flex: "1 1 320px",
                 }}
               >
                 <span
                   aria-hidden="true"
                   style={{
+                    width: 24,
+                    minWidth: 24,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     color: "var(--text-3)",
-                    fontSize: 18,
+                    fontSize: 14,
+                    lineHeight: 1,
+                    marginTop: 6,
                     transform: recentInsightsOpen ? "rotate(180deg)" : "rotate(0deg)",
                     transition: "transform 0.2s ease",
                   }}
                 >
                   ▾
                 </span>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <h2
                     style={{
                       fontSize: 20,
                       fontWeight: 700,
                       color: "var(--text)",
                       margin: "0 0 4px",
+                      lineHeight: 1.2,
                     }}
                   >
                     Recent Insights
                   </h2>
-                  <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                  <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14, lineHeight: 1.5 }}>
                     The latest saved reports and useful outputs generated across your agents.
                   </p>
                 </div>
