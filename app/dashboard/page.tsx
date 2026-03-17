@@ -194,9 +194,9 @@ export default function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [recentInsights, setRecentInsights] = useState<RecentInsight[]>([]);
-  const [performanceInsightsOpen, setPerformanceInsightsOpen] = useState(false);
-  const [recentInsightsOpen, setRecentInsightsOpen] = useState(false);
-  const [recentActivityOpen, setRecentActivityOpen] = useState(false);
+  const [performanceInsightsOpen, setPerformanceInsightsOpen] = useState(true);
+  const [recentInsightsOpen, setRecentInsightsOpen] = useState(true);
+  const [recentActivityOpen, setRecentActivityOpen] = useState(true);
   const [agentsOpen, setAgentsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
