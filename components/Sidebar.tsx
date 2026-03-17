@@ -25,10 +25,11 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<CurrentUser | null>(() => getUser());
+  const [canSeeAdmin, setCanSeeAdmin] = useState(false);
   const plan = normalizePlan(user?.plan);
   const { themeMode, themeFamily, toggleTheme } = useTheme();
   const themeName = getThemeDefinition(themeFamily).name;
-  const navItems = NAV_ITEMS.filter((item) => item.href !== "/admin" || user?.is_admin === true);
+  const navItems = NAV_ITEMS.filter((item) => item.href !== "/admin" || canSeeAdmin);
 
   useEffect(() => {
     let active = true;
@@ -37,10 +38,14 @@ export default function Sidebar() {
       .then((nextUser) => {
         if (active && nextUser) {
           setUser(nextUser);
+          setCanSeeAdmin(nextUser.is_admin === true);
         }
       })
       .catch(() => {
         // Keep cached user data if the refresh fails.
+        if (active) {
+          setCanSeeAdmin(false);
+        }
       });
 
     return () => {
