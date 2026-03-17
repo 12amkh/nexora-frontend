@@ -144,6 +144,131 @@ const formatRunTime = (isoDate?: string | null) => {
   })
 }
 
+const formatPromptPreview = (value: string, maxLength = 140) => {
+  const compact = value.replace(/\s+/g, ' ').trim()
+  if (compact.length <= maxLength) return compact
+  return `${compact.slice(0, maxLength - 1).trimEnd()}…`
+}
+
+const formatRelativeTime = (isoDate?: string | null) => {
+  if (!isoDate) return null
+
+  const date = new Date(isoDate)
+  if (Number.isNaN(date.getTime())) return null
+
+  const diffMs = date.getTime() - Date.now()
+  const absMinutes = Math.round(Math.abs(diffMs) / 60000)
+
+  if (absMinutes < 1) return diffMs >= 0 ? 'in less than a minute' : 'less than a minute ago'
+  if (absMinutes < 60) return diffMs >= 0 ? `in ${absMinutes}m` : `${absMinutes}m ago`
+
+  const absHours = Math.round(absMinutes / 60)
+  if (absHours < 24) return diffMs >= 0 ? `in ${absHours}h` : `${absHours}h ago`
+
+  const absDays = Math.round(absHours / 24)
+  return diffMs >= 0 ? `in ${absDays}d` : `${absDays}d ago`
+}
+
+const getNextRunTime = (cron: string, isActive: boolean): string | null => {
+  if (!isActive) return null
+
+  const parts = cron.split(' ')
+  if (parts.length !== 5) return null
+
+  const [, hourValue, dayOfMonth, , dayOfWeek] = parts
+  const hour = Number(hourValue)
+  if (Number.isNaN(hour)) return null
+
+  const now = new Date()
+  const next = new Date(now)
+  next.setSeconds(0, 0)
+
+  if (cron === '0 * * * *') {
+    next.setMinutes(0)
+    next.setHours(now.getHours() + 1)
+    return next.toISOString()
+  }
+
+  next.setMinutes(0)
+  next.setHours(hour, 0, 0, 0)
+
+  if (dayOfMonth === '1' && dayOfWeek === '*') {
+    if (next <= now || next.getDate() !== 1) {
+      next.setMonth(next.getMonth() + 1, 1)
+      next.setHours(hour, 0, 0, 0)
+    } else {
+      next.setDate(1)
+    }
+    return next.toISOString()
+  }
+
+  if (dayOfWeek !== '*') {
+    const targetDay = Number(dayOfWeek)
+    if (Number.isNaN(targetDay)) return null
+    const currentDay = now.getDay()
+    let diff = targetDay - currentDay
+    if (diff < 0 || (diff === 0 && next <= now)) diff += 7
+    next.setDate(now.getDate() + diff)
+    next.setHours(hour, 0, 0, 0)
+    return next.toISOString()
+  }
+
+  if (next <= now) {
+    next.setDate(next.getDate() + 1)
+  }
+
+  return next.toISOString()
+}
+
+const getScheduleStatusMeta = (
+  schedule: Schedule,
+  taskResult?: TaskResult,
+  isRunning?: boolean
+) => {
+  if (isRunning || taskResult?.status === 'pending' || taskResult?.status === 'started' || taskResult?.status === 'retry') {
+    return {
+      label: taskResult?.status === 'retry' ? 'Retrying run' : 'Run in progress',
+      color: 'var(--accent)',
+      background: 'rgba(217,121,85,0.12)',
+      border: 'rgba(217,121,85,0.28)',
+    }
+  }
+
+  if (!schedule.is_active) {
+    return {
+      label: 'Paused',
+      color: 'var(--text-2)',
+      background: 'var(--bg-3)',
+      border: 'var(--border)',
+    }
+  }
+
+  if (schedule.last_run_status?.toLowerCase() === 'failed' || taskResult?.status === 'failure') {
+    return {
+      label: 'Needs attention',
+      color: 'var(--red)',
+      background: 'rgba(248,113,113,0.12)',
+      border: 'rgba(248,113,113,0.3)',
+    }
+  }
+
+  if (schedule.last_run_status?.toLowerCase() === 'success' || taskResult?.status === 'success') {
+    return {
+      label: 'Healthy',
+      color: 'var(--green)',
+      background: 'rgba(52,211,153,0.12)',
+      border: 'rgba(52,211,153,0.3)',
+    }
+  }
+
+  return {
+    label: 'Scheduled',
+    color: 'var(--text-2)',
+    background: 'var(--bg-3)',
+    border: 'var(--border)',
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SchedulesPage() {
@@ -603,6 +728,11 @@ export default function SchedulesPage() {
   const limit   = PLAN_LIMITS[plan] ?? 0
   const isFree  = plan === 'free'
   const atLimit = limit !== null && schedules.length >= limit && !isFree
+  const activeCount = schedules.filter(schedule => schedule.is_active).length
+  const runningCount = running.size
+  const lastCompletedRun = schedules
+    .filter(schedule => Boolean(schedule.last_run_at))
+    .sort((a, b) => new Date(b.last_run_at ?? 0).getTime() - new Date(a.last_run_at ?? 0).getTime())[0]
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -709,6 +839,42 @@ export default function SchedulesPage() {
             fontSize: 14, marginBottom: 24,
           }}>
             {error}
+          </div>
+        )}
+
+        {!loading && schedules.length > 0 && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 12,
+            marginBottom: 20,
+          }}>
+            {[
+              { label: 'Active schedules', value: String(activeCount), note: `${schedules.length - activeCount} paused` },
+              { label: 'Currently running', value: String(runningCount), note: runningCount > 0 ? 'Live task polling enabled' : 'No active manual runs' },
+              {
+                label: 'Most recent run',
+                value: lastCompletedRun?.last_run_at ? formatRunTime(lastCompletedRun.last_run_at) ?? 'No runs yet' : 'No runs yet',
+                note: lastCompletedRun?.name ? lastCompletedRun.name : 'Your schedules will show run history here',
+              },
+            ].map((item) => (
+              <div key={item.label} style={{
+                background: 'var(--bg-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 12,
+                padding: '16px 18px',
+              }}>
+                <div style={{ color: 'var(--text-3)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                  {item.label}
+                </div>
+                <div style={{ color: 'var(--text)', fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
+                  {item.value}
+                </div>
+                <div style={{ color: 'var(--text-2)', fontSize: 12, lineHeight: 1.5 }}>
+                  {item.note}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -829,94 +995,135 @@ export default function SchedulesPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {schedules.map(schedule => (
               <div key={schedule.id}>
+                {(() => {
+                  const taskResult = taskResults[schedule.id]
+                  const nextRunIso = getNextRunTime(schedule.cron, schedule.is_active)
+                  const statusMeta = getScheduleStatusMeta(schedule, taskResult, running.has(schedule.id))
+                  const lastRunLabel = formatRunTime(schedule.last_run_at)
+                  const nextRunLabel = formatRunTime(nextRunIso)
+                  const nextRunRelative = formatRelativeTime(nextRunIso)
+                  const lastRunRelative = formatRelativeTime(schedule.last_run_at)
 
-                <div style={{
-                  background: 'var(--bg-2)', border: '1px solid var(--border)',
-                  borderRadius: taskResults[schedule.id] ? '12px 12px 0 0' : 12,
-                  padding: '18px 20px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>
-                          {schedule.name}
-                        </span>
-                        <span style={{
-                          padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                          background: schedule.is_active ? 'rgba(52,211,153,0.12)' : 'var(--bg-3)',
-                          color: schedule.is_active ? 'var(--green)' : 'var(--text-3)',
-                          border: `1px solid ${schedule.is_active ? 'var(--green)' : 'var(--border)'}`,
-                        }}>
-                          {schedule.is_active ? 'Active' : 'Paused'}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-2)' }}>
-                        <span>🕐 {cronToLabel(schedule.cron)}</span>
-                        <span>🤖 {schedule.agent_name}</span>
-                      </div>
-                      {(schedule.last_run_at || schedule.last_run_status) && (
-                        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
-                          {schedule.last_run_at && (
-                            <span>Last run: {formatRunTime(schedule.last_run_at)}</span>
-                          )}
-                          {schedule.last_run_status && (
-                            <span style={{ textTransform: 'capitalize' }}>
-                              Status: {schedule.last_run_status}
+                  return (
+                    <div style={{
+                      background: 'var(--bg-2)', border: '1px solid var(--border)',
+                      borderRadius: taskResults[schedule.id] ? '12px 12px 0 0' : 12,
+                      padding: '18px 20px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>
+                              {schedule.name}
                             </span>
-                          )}
+                            <span style={{
+                              padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                              background: statusMeta.background,
+                              color: statusMeta.color,
+                              border: `1px solid ${statusMeta.border}`,
+                            }}>
+                              {statusMeta.label}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-2)', flexWrap: 'wrap', marginBottom: 10 }}>
+                            <span>🤖 {schedule.agent_name}</span>
+                            <span>🕐 {cronToLabel(schedule.cron)}</span>
+                            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--text-3)' }}>
+                              {schedule.cron}
+                            </span>
+                          </div>
+
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                            gap: 10,
+                            marginBottom: 12,
+                          }}>
+                            <div style={metaCardStyle}>
+                              <div style={metaLabelStyle}>Last run</div>
+                              <div style={metaValueStyle}>{lastRunLabel ?? 'Not run yet'}</div>
+                              <div style={metaHintStyle}>
+                                {lastRunRelative ?? 'This schedule has not run yet.'}
+                              </div>
+                            </div>
+                            <div style={metaCardStyle}>
+                              <div style={metaLabelStyle}>Next run</div>
+                              <div style={metaValueStyle}>{nextRunLabel ?? 'Paused until resumed'}</div>
+                              <div style={metaHintStyle}>
+                                {nextRunRelative ?? (schedule.is_active ? 'Waiting for the next matching time.' : 'Resume this schedule to queue future runs.')}
+                              </div>
+                            </div>
+                            <div style={metaCardStyle}>
+                              <div style={metaLabelStyle}>Current status</div>
+                              <div style={metaValueStyle}>
+                                {schedule.last_run_status
+                                  ? schedule.last_run_status.charAt(0).toUpperCase() + schedule.last_run_status.slice(1)
+                                  : schedule.is_active ? 'Ready to run' : 'Paused'}
+                              </div>
+                              <div style={metaHintStyle}>
+                                {schedule.is_active ? 'This automation is enabled and can run on schedule.' : 'This automation is currently inactive.'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{
+                            background: 'var(--bg-3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 10,
+                            padding: '12px 14px',
+                          }}>
+                            <div style={{ ...metaLabelStyle, marginBottom: 6 }}>What this schedule does</div>
+                            <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7 }}>
+                              {formatPromptPreview(schedule.task_message, 220)}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                      <div style={{
-                        marginTop: 8, fontSize: 13, color: 'var(--text-3)',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        maxWidth: 480,
-                      }}>
-                        &quot;{schedule.task_message}&quot;
+
+                        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignSelf: 'flex-start' }}>
+                          <button
+                            onClick={() => handleRun(schedule.id)}
+                            disabled={running.has(schedule.id)}
+                            style={{
+                              padding: '6px 14px', borderRadius: 8,
+                              background: 'var(--bg-3)', border: '1px solid var(--border-2)',
+                              color: running.has(schedule.id) ? 'var(--text-3)' : 'var(--text)',
+                              fontSize: 13, fontWeight: 600,
+                              cursor: running.has(schedule.id) ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            {running.has(schedule.id) ? '⏳ Running' : '▶ Run now'}
+                          </button>
+
+                          <button
+                            onClick={() => handleToggle(schedule)}
+                            disabled={toggling.has(schedule.id)}
+                            title={schedule.is_active ? 'Pause' : 'Resume'}
+                            style={{
+                              padding: '6px 10px', borderRadius: 8,
+                              background: 'var(--bg-3)', border: '1px solid var(--border)',
+                              color: toggling.has(schedule.id) ? 'var(--text-3)' : 'var(--text-2)',
+                              fontSize: 13, cursor: toggling.has(schedule.id) ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            {toggling.has(schedule.id) ? '·' : schedule.is_active ? '⏸' : '▶'}
+                          </button>
+
+                          <button
+                            onClick={() => setSchedulePendingDelete(schedule)}
+                            style={{
+                              padding: '6px 10px', borderRadius: 8,
+                              background: 'transparent', border: '1px solid var(--border)',
+                              color: 'var(--text-3)', fontSize: 13, cursor: 'pointer',
+                            }}
+                          >
+                            🗑
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                      <button
-                        onClick={() => handleRun(schedule.id)}
-                        disabled={running.has(schedule.id)}
-                        style={{
-                          padding: '6px 14px', borderRadius: 8,
-                          background: 'var(--bg-3)', border: '1px solid var(--border-2)',
-                          color: running.has(schedule.id) ? 'var(--text-3)' : 'var(--text)',
-                          fontSize: 13, fontWeight: 500,
-                          cursor: running.has(schedule.id) ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        {running.has(schedule.id) ? '⏳' : '▶ Run'}
-                      </button>
-
-                      <button
-                        onClick={() => handleToggle(schedule)}
-                        disabled={toggling.has(schedule.id)}
-                        title={schedule.is_active ? 'Pause' : 'Resume'}
-                        style={{
-                          padding: '6px 10px', borderRadius: 8,
-                          background: 'var(--bg-3)', border: '1px solid var(--border)',
-                          color: toggling.has(schedule.id) ? 'var(--text-3)' : 'var(--text-2)',
-                          fontSize: 13, cursor: toggling.has(schedule.id) ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        {toggling.has(schedule.id) ? '·' : schedule.is_active ? '⏸' : '▶'}
-                      </button>
-
-                      <button
-                        onClick={() => setSchedulePendingDelete(schedule)}
-                        style={{
-                          padding: '6px 10px', borderRadius: 8,
-                          background: 'transparent', border: '1px solid var(--border)',
-                          color: 'var(--text-3)', fontSize: 13, cursor: 'pointer',
-                        }}
-                      >
-                        🗑
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  )
+                })()}
 
                 {/* Task result panel */}
                 {taskResults[schedule.id] && (() => {
@@ -995,4 +1202,32 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--bg-3)', border: '1px solid var(--border)',
   borderRadius: 8, color: 'var(--text)', fontSize: 14,
   outline: 'none', boxSizing: 'border-box',
+}
+
+const metaCardStyle: React.CSSProperties = {
+  background: 'var(--bg-3)',
+  border: '1px solid var(--border)',
+  borderRadius: 10,
+  padding: '12px 14px',
+}
+
+const metaLabelStyle: React.CSSProperties = {
+  color: 'var(--text-3)',
+  fontSize: 11,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+}
+
+const metaValueStyle: React.CSSProperties = {
+  color: 'var(--text)',
+  fontSize: 14,
+  fontWeight: 600,
+  marginTop: 6,
+}
+
+const metaHintStyle: React.CSSProperties = {
+  color: 'var(--text-2)',
+  fontSize: 12,
+  lineHeight: 1.5,
+  marginTop: 4,
 }
