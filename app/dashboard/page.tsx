@@ -13,11 +13,14 @@ interface Agent {
   id: number;
   name: string;
   description: string;
+  created_at?: string;
   user_id?: number;
   config?: {
     agent_type?: string;
     tone?: string;
     use_web_search?: boolean;
+    response_length?: string;
+    welcome_message?: string;
   };
 }
 
@@ -38,6 +41,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [deletingAgentId, setDeletingAgentId] = useState<number | null>(null);
   const [agentPendingDelete, setAgentPendingDelete] = useState<Agent | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -87,6 +91,10 @@ export default function Dashboard() {
   const handleDeleteAgent = async (agent: Agent) => {
     if (deletingAgentId) return;
     setAgentPendingDelete(agent);
+  };
+
+  const handleInspectAgent = (agent: Agent) => {
+    setSelectedAgent(agent);
   };
 
   const confirmDeleteAgent = async () => {
@@ -158,6 +166,222 @@ export default function Dashboard() {
           }
         }}
       />
+      {selectedAgent && (
+        <div
+          onClick={() => setSelectedAgent(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(3, 6, 18, 0.72)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            style={{
+              width: "100%",
+              maxWidth: 760,
+              background: "linear-gradient(180deg, rgba(19,20,28,0.98) 0%, rgba(12,13,19,0.98) 100%)",
+              border: "1px solid var(--border)",
+              borderRadius: 24,
+              boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
+              padding: 28,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 20,
+                marginBottom: 22,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    background: "rgba(217,121,85,0.1)",
+                    color: "var(--accent)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    marginBottom: 12,
+                  }}
+                >
+                  Agent Details
+                </div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 30,
+                    fontWeight: 700,
+                    color: "var(--text)",
+                    letterSpacing: "-0.03em",
+                  }}
+                >
+                  {selectedAgent.name}
+                </h3>
+                <div style={{ color: "var(--text-3)", fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 8 }}>
+                  {(selectedAgent.config?.agent_type || "custom").replace(/_/g, " ")}
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedAgent(null)}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 999,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-3)",
+                  color: "var(--text)",
+                  fontSize: 18,
+                  cursor: "pointer",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14, marginBottom: 20 }}>
+              {[
+                { label: "Type", value: (selectedAgent.config?.agent_type || "custom").replace(/_/g, " ") },
+                { label: "Tone", value: selectedAgent.config?.tone || "professional" },
+                { label: "Status", value: selectedAgent.config?.use_web_search ? "Web search enabled" : "Knowledge only" },
+                { label: "Response length", value: selectedAgent.config?.response_length || "medium" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    padding: "14px 16px",
+                    borderRadius: 16,
+                    background: "var(--bg-3)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                    {item.label}
+                  </div>
+                  <div style={{ color: "var(--text)", fontSize: 15, fontWeight: 600, textTransform: "capitalize" }}>
+                    {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div
+              style={{
+                background: "var(--bg-3)",
+                border: "1px solid var(--border)",
+                borderRadius: 18,
+                padding: 18,
+                marginBottom: 18,
+              }}
+            >
+              <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+                Full Description
+              </div>
+              <div style={{ color: "var(--text-2)", fontSize: 15, lineHeight: 1.8 }}>
+                {selectedAgent.description || "No description yet. Open this agent to start chatting and customizing it."}
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "var(--bg-3)",
+                border: "1px solid var(--border)",
+                borderRadius: 18,
+                padding: 18,
+                marginBottom: 22,
+              }}
+            >
+              <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+                Config Summary
+              </div>
+              <div style={{ display: "grid", gap: 10, color: "var(--text-2)", fontSize: 14 }}>
+                <div>
+                  <span style={{ color: "var(--text)", fontWeight: 700 }}>Behavior:</span>{" "}
+                  {selectedAgent.config?.use_web_search ? "Research and web context enabled." : "Focused on built-in knowledge and conversation context."}
+                </div>
+                <div>
+                  <span style={{ color: "var(--text)", fontWeight: 700 }}>Tone:</span>{" "}
+                  {(selectedAgent.config?.tone || "professional").replace(/_/g, " ")}
+                </div>
+                <div>
+                  <span style={{ color: "var(--text)", fontWeight: 700 }}>Welcome:</span>{" "}
+                  {selectedAgent.config?.welcome_message || "Uses the default welcome message."}
+                </div>
+                <div>
+                  <span style={{ color: "var(--text)", fontWeight: 700 }}>Created:</span>{" "}
+                  {selectedAgent.created_at ? new Date(selectedAgent.created_at).toLocaleString() : "Recently created"}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setSelectedAgent(null)}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  border: "1px solid var(--border-2)",
+                  background: "transparent",
+                  color: "var(--text-2)",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+              <Link
+                href={`/agents/${selectedAgent.id}/edit`}
+                onClick={() => setSelectedAgent(null)}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-3)",
+                  color: "var(--text)",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                Edit
+              </Link>
+              <Link
+                href={`/agents/${selectedAgent.id}`}
+                onClick={() => setSelectedAgent(null)}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "var(--accent)",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                Open
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
       <Sidebar />
       <main style={{ marginLeft: 220, flex: 1, padding: "40px 48px" }}>
         <div style={{ maxWidth: 1400 }}>
@@ -539,6 +763,7 @@ export default function Dashboard() {
                       <AgentCard
                         key={agent.id}
                         agent={agent}
+                        onInspect={handleInspectAgent}
                         onDelete={handleDeleteAgent}
                         deleting={deletingAgentId === agent.id}
                       />

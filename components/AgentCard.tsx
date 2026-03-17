@@ -8,21 +8,25 @@ interface Agent {
   id: number;
   name: string;
   description: string;
+  created_at?: string;
   user_id?: number;
   config?: {
     agent_type?: string;
     tone?: string;
     use_web_search?: boolean;
+    response_length?: string;
+    welcome_message?: string;
   };
 }
 
 interface AgentCardProps {
   agent: Agent;
+  onInspect?: (agent: Agent) => void;
   onDelete?: (agent: Agent) => void | Promise<void>;
   deleting?: boolean;
 }
 
-export default function AgentCard({ agent, onDelete, deleting = false }: AgentCardProps) {
+export default function AgentCard({ agent, onInspect, onDelete, deleting = false }: AgentCardProps) {
   const router = useRouter();
   const agentType = (agent.config?.agent_type || "custom").replace(/_/g, " ");
   const tone = agent.config?.tone || "professional";
@@ -38,6 +42,12 @@ export default function AgentCard({ agent, onDelete, deleting = false }: AgentCa
     event.preventDefault();
     event.stopPropagation();
     onDelete?.(agent);
+  };
+
+  const handleInspectClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onInspect?.(agent);
   };
 
   const handleCardOpen = () => {
@@ -220,6 +230,23 @@ export default function AgentCard({ agent, onDelete, deleting = false }: AgentCa
         }}
       >
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {onInspect && (
+            <button
+              onClick={handleInspectClick}
+              style={{
+                padding: "9px 14px",
+                borderRadius: 10,
+                background: "var(--bg-3)",
+                border: "1px solid var(--border)",
+                color: "var(--text)",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Details
+            </button>
+          )}
           <Link
             href={`/agents/${agent.id}`}
             onClick={(event) => event.stopPropagation()}
