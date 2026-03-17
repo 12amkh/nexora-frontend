@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPlanName, getUser, logout, normalizePlan, refreshCurrentUser, type CurrentUser } from "@/lib/api";
-import { useTheme } from "@/components/ThemeProvider";
-import { getThemeDefinition } from "@/lib/themes";
 
 const PLAN_COLORS: Record<string, string> = {
   free: "#8888a0",
@@ -18,7 +16,6 @@ const PLAN_COLORS: Record<string, string> = {
 const NAV_ITEMS = [
   { href: "/dashboard", label: "🤖  Agents" },
   { href: "/schedules", label: "⏰  Schedules" },
-  { href: "/settings", label: "⚙️  Settings" },
   { href: "/admin", label: "🛠  Admin" },
 ];
 
@@ -27,9 +24,8 @@ export default function Sidebar() {
   const [user, setUser] = useState<CurrentUser | null>(() => getUser());
   const [canSeeAdmin, setCanSeeAdmin] = useState(false);
   const plan = normalizePlan(user?.plan);
-  const { themeMode, themeFamily, toggleTheme } = useTheme();
-  const themeName = getThemeDefinition(themeFamily).name;
   const navItems = NAV_ITEMS.filter((item) => item.href !== "/admin" || canSeeAdmin);
+  const settingsIsActive = pathname === "/settings";
 
   useEffect(() => {
     let active = true;
@@ -156,23 +152,25 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <button
-          onClick={() => void toggleTheme()}
+        <Link
+          href="/settings"
           style={{
-            width: "100%",
-            textAlign: "left",
+            display: "block",
             padding: "0.5rem 0.75rem",
-            background: "transparent",
-            border: "none",
-            color: "var(--text-2)",
-            fontSize: "0.85rem",
-            cursor: "pointer",
-            borderRadius: 6,
+            borderRadius: 7,
+            fontSize: "0.875rem",
+            fontWeight: settingsIsActive ? 600 : 400,
+            background: settingsIsActive ? "var(--accent-g)" : "transparent",
+            color: settingsIsActive ? "var(--text)" : "var(--text-2)",
+            border: settingsIsActive
+              ? "1px solid rgba(108,99,255,0.2)"
+              : "1px solid transparent",
             marginBottom: 4,
+            textDecoration: "none",
           }}
         >
-          {themeMode === "dark" ? `Light ${themeName}` : `Dark ${themeName}`}
-        </button>
+          ⚙️  Settings
+        </Link>
 
         <button
           onClick={logout}

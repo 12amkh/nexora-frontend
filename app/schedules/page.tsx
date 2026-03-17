@@ -6,8 +6,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, formatPlanName, getUser, logout, getErrorMessage, normalizePlan, refreshCurrentUser } from '@/lib/api'
+import { api, getUser, getErrorMessage, normalizePlan, refreshCurrentUser } from '@/lib/api'
 import RichContent from '@/components/RichContent'
+import Sidebar from '@/components/Sidebar'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,10 +40,6 @@ type CachedTaskResultMap = Record<string, { status: TaskResult['status']; result
 
 const PLAN_LIMITS: Record<string, number | null> = {
   free: 0, starter: 3, pro: 10, business: 50, enterprise: null,
-}
-
-const PLAN_COLORS: Record<string, string> = {
-  free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b', enterprise: '#ec4899',
 }
 
 const PENDING_TASKS_STORAGE_KEY = 'nexora_pending_schedule_tasks'
@@ -531,56 +528,7 @@ export default function SchedulesPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
-
-      {/* ── Sidebar ── */}
-      <aside style={{
-        width: 220, minHeight: '100vh',
-        background: 'var(--bg-2)', borderRight: '1px solid var(--border)',
-        display: 'flex', flexDirection: 'column', padding: '20px 16px',
-        position: 'fixed', top: 0, left: 0, zIndex: 10,
-      }}>
-        <Link href="/dashboard" style={{
-          fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.03em',
-          padding: '0.5rem 0.75rem', display: 'block', marginBottom: '1.25rem',
-          color: 'var(--text)', textDecoration: 'none',
-        }}>
-          Nexora
-        </Link>
-        <NavItem href="/dashboard" label="🤖  Agents"   active={false} />
-        <NavItem href="/schedules" label="⏰  Schedules" active={true}  />
-
-        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-          <div style={{ padding: '0.5rem 0.75rem' }}>
-            <div style={{
-              fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)',
-              marginBottom: '0.15rem', overflow: 'hidden',
-              textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {user?.name || user?.email}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: PLAN_COLORS[plan], display: 'inline-block',
-              }} />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-2)', textTransform: 'capitalize' }}>
-                {formatPlanName(plan)} plan
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={logout}
-            style={{
-              width: '100%', textAlign: 'left', padding: '0.5rem 0.75rem',
-              background: 'transparent', border: 'none',
-              color: 'var(--text-3)', fontSize: '0.85rem',
-              cursor: 'pointer', borderRadius: 6,
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      </aside>
+      <Sidebar />
 
       {/* ── Main ── */}
       <main style={{ marginLeft: 220, flex: 1, padding: '40px 48px', maxWidth: 860 }}>
@@ -951,19 +899,4 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--bg-3)', border: '1px solid var(--border)',
   borderRadius: 8, color: 'var(--text)', fontSize: 14,
   outline: 'none', boxSizing: 'border-box',
-}
-
-function NavItem({ href, label, active }: { href: string; label: string; active: boolean }) {
-  return (
-    <Link href={href} style={{
-      display: 'block', padding: '0.5rem 0.75rem', borderRadius: 7,
-      fontSize: '0.875rem', fontWeight: active ? 600 : 400,
-      background: active ? 'var(--accent-g)' : 'transparent',
-      color: active ? 'var(--text)' : 'var(--text-2)',
-      border: active ? '1px solid rgba(108,99,255,0.2)' : '1px solid transparent',
-      marginBottom: '0.1rem', textDecoration: 'none',
-    }}>
-      {label}
-    </Link>
-  )
 }
