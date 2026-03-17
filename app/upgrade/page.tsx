@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { AppStateCard, StateActionButton } from '@/components/AppState'
 import { UpgradeLoadingState } from '@/components/LoadingSkeleton'
 import Sidebar from '@/components/Sidebar'
 import { formatPlanName, getUser, normalizePlan, refreshCurrentUser } from '@/lib/api'
@@ -77,27 +78,29 @@ const PLAN_ORDER: Record<PlanName, number> = {
 export default function UpgradePage() {
   const [user, setUser] = useState<UserShape>(null)
   const [hydrated, setHydrated] = useState(false)
+  const [refreshError, setRefreshError] = useState(false)
 
-  useEffect(() => {
-    const init = async () => {
-      const cachedUser = getUser()
-      if (cachedUser) {
-        setUser(cachedUser)
-      }
-
-      try {
-        const freshUser = await refreshCurrentUser()
-        if (freshUser) {
-          setUser(freshUser)
-        }
-      } catch {
-        // Keep showing cached or logged-out state if refresh fails.
-      } finally {
-        setHydrated(true)
-      }
+  const loadUpgradeContext = async () => {
+    const cachedUser = getUser()
+    if (cachedUser) {
+      setUser(cachedUser)
     }
 
-    init()
+    try {
+      const freshUser = await refreshCurrentUser()
+      if (freshUser) {
+        setUser(freshUser)
+      }
+      setRefreshError(false)
+    } catch {
+      setRefreshError(true)
+    } finally {
+      setHydrated(true)
+    }
+  }
+
+  useEffect(() => {
+    void loadUpgradeContext()
   }, [])
 
   const normalizedPlan = normalizePlan(user?.plan) as PlanName
@@ -182,6 +185,20 @@ export default function UpgradePage() {
               {isLoggedIn ? 'Back to settings' : 'Sign in'}
             </Link>
           </div>
+
+          {refreshError && (
+            <div style={{ marginBottom: 24 }}>
+              <AppStateCard
+                eyebrow='Plan refresh issue'
+                icon='⚠️'
+                title='Showing the last known plan details'
+                description='Nexora could not refresh your latest account status, so pricing is shown using the last available profile data. You can retry without leaving this page.'
+                tone='warning'
+                compact
+                actions={<StateActionButton label='Retry refresh' onClick={() => void loadUpgradeContext()} />}
+              />
+            </div>
+          )}
 
           <div style={{
             background: 'var(--bg-2)',

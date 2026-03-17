@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { AppStateCard, StateActionButton } from '@/components/AppState'
 import { SettingsLoadingState } from '@/components/LoadingSkeleton'
 import Sidebar from '@/components/Sidebar'
 import UsageStats from '@/components/UsageStats'
@@ -64,6 +65,7 @@ export default function SettingsPage() {
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [statsError, setStatsError] = useState('')
   const [nameInput, setNameInput] = useState('')
   const [updatingProfile, setUpdatingProfile] = useState(false)
   const [savingTheme, setSavingTheme] = useState(false)
@@ -111,8 +113,9 @@ export default function SettingsPage() {
     try {
       const response = await fetchStatsData()
       setStats(response)
+      setStatsError('')
     } catch {
-      // Stats are useful but not required to render the page.
+      setStatsError("We couldn't load your account activity summary.")
     }
   }
 
@@ -412,49 +415,60 @@ export default function SettingsPage() {
               title='Plan and activity'
               description='Track what you are using today and how your account is progressing over time.'
             >
-              <div style={statsGridStyle}>
-                <StatsPanel
-                  title='Workspace activity'
-                  description='A quick summary of what this account has created and used so far.'
-                >
-                  <div style={miniStatsGridStyle}>
-                    <StatBox label='Active agents' value={String(stats?.total_agents ?? '-')} />
-                    <StatBox label='Total messages' value={String(stats?.total_messages ?? '-')} />
-                    <StatBox label='Messages sent' value={String(stats?.messages_sent ?? '-')} />
-                  </div>
-                </StatsPanel>
+              {statsError ? (
+                <AppStateCard
+                  eyebrow='Activity unavailable'
+                  icon='📉'
+                  title='Account activity could not be loaded'
+                  description={`${statsError} Your saved settings are still available, and you can retry the summary whenever you want.`}
+                  tone='error'
+                  actions={<StateActionButton label='Retry activity' onClick={() => void fetchStats()} />}
+                />
+              ) : (
+                <div style={statsGridStyle}>
+                  <StatsPanel
+                    title='Workspace activity'
+                    description='A quick summary of what this account has created and used so far.'
+                  >
+                    <div style={miniStatsGridStyle}>
+                      <StatBox label='Active agents' value={String(stats?.total_agents ?? '-')} />
+                      <StatBox label='Total messages' value={String(stats?.total_messages ?? '-')} />
+                      <StatBox label='Messages sent' value={String(stats?.messages_sent ?? '-')} />
+                    </div>
+                  </StatsPanel>
 
-                <StatsPanel
-                  title='Subscription'
-                  description='Your current plan determines limits, billing features, and access to upgrades.'
-                >
-                  <div style={planPanelStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          background: PLAN_COLORS[plan] ?? PLAN_COLORS.free,
-                          display: 'inline-block',
-                        }}
-                      />
-                      <div>
-                        <div style={planValueStyle}>{formatPlanName(plan)}</div>
-                        <div style={planCaptionStyle}>
-                          {plan === 'free'
-                            ? 'Upgrade to unlock more agents, schedules, and higher usage limits.'
-                            : 'Your plan is active and ready for more automation.'}
+                  <StatsPanel
+                    title='Subscription'
+                    description='Your current plan determines limits, billing features, and access to upgrades.'
+                  >
+                    <div style={planPanelStyle}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: PLAN_COLORS[plan] ?? PLAN_COLORS.free,
+                            display: 'inline-block',
+                          }}
+                        />
+                        <div>
+                          <div style={planValueStyle}>{formatPlanName(plan)}</div>
+                          <div style={planCaptionStyle}>
+                            {plan === 'free'
+                              ? 'Upgrade to unlock more agents, schedules, and higher usage limits.'
+                              : 'Your plan is active and ready for more automation.'}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <Link href='/dashboard/upgrade' style={upgradeLinkStyle}>
-                      Review plans
-                    </Link>
-                  </div>
-                </StatsPanel>
-              </div>
+                      <Link href='/dashboard/upgrade' style={upgradeLinkStyle}>
+                        Review plans
+                      </Link>
+                    </div>
+                  </StatsPanel>
+                </div>
+              )}
 
               <div style={{ marginTop: 24 }}>
                 <UsageStats />

@@ -7,6 +7,7 @@ import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx'
 import { jsPDF } from 'jspdf'
 
 import { api, getErrorMessage, getToken } from '@/lib/api'
+import { AppStateCard, StateActionButton } from '@/components/AppState'
 import { AgentPageLoadingState, ReportsLoadingState } from '@/components/LoadingSkeleton'
 import RichContent, { parseRichContent } from '@/components/RichContent'
 
@@ -112,6 +113,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [reportsLoaded, setReportsLoaded] = useState(false)
   const [previewReport, setPreviewReport] = useState<Report | null>(null)
   const [error, setError] = useState('')
+  const [agentLoadError, setAgentLoadError] = useState('')
+  const [historyError, setHistoryError] = useState('')
+  const [reportsError, setReportsError] = useState('')
   const [upgradeMessage, setUpgradeMessage] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const recentContext = messages.slice(-4)
@@ -148,8 +152,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     try {
       const { data } = await api.get(`/agents/${id}`)
       setAgent(data)
+      setAgentLoadError('')
     } catch {
-      router.push('/dashboard')
+      setAgentLoadError("We couldn't load this agent right now.")
     }
   }
 
@@ -163,19 +168,22 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
           createdAt: message.created_at,
         }))
       )
+      setHistoryError('')
     } catch {
-      // Empty history is fine.
+      setHistoryError("We couldn't load the recent conversation.")
     }
   }
 
   const loadReports = async () => {
     setReportsLoading(true)
+    setReportsError('')
     try {
       const { data } = await api.get(`/agents/${id}/reports`)
       setReports(data)
       setReportsLoaded(true)
     } catch {
       setReports([])
+      setReportsError("We couldn't load the saved reports.")
     } finally {
       setReportsLoading(false)
     }
@@ -450,6 +458,44 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     return <AgentPageLoadingState />
   }
 
+  if (agentLoadError && !agent) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        <div style={{ width: 'min(720px, 100%)' }}>
+          <AppStateCard
+            eyebrow='Agent unavailable'
+            icon='🤖'
+            title='This agent could not be opened'
+            description={`${agentLoadError} You can try again now or head back to your dashboard.`}
+            tone='error'
+            actions={
+              <>
+                <StateActionButton label='Retry agent' onClick={() => {
+                  setPageLoading(true)
+                  void Promise.all([loadAgent(), loadHistory()]).finally(() => setPageLoading(false))
+                }} />
+                <Link href='/dashboard' style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  border: '1px solid var(--border-2)',
+                  background: 'var(--bg-2)',
+                  color: 'var(--text)',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                }}>
+                  Back to dashboard
+                </Link>
+              </>
+            }
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)' }}>
@@ -489,11 +535,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         )}
       </div>
 
-      {error && (
+      {(error || historyError) && (
         <div style={{ maxWidth: '900px', width: '100%', margin: '1rem auto 0', padding: '0 2rem' }}>
-          <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid var(--red)', borderRadius: '10px', color: 'var(--red)', padding: '0.9rem 1rem', fontSize: '0.9rem' }}>
-            {error}
-          </div>
+          <AppStateCard
+            eyebrow='Conversation issue'
+            icon='⚠️'
+            title='Part of this conversation needs another try'
+            description={error || historyError}
+            tone='error'
+            compact
+            actions={<StateActionButton label='Retry conversation' onClick={() => void loadHistory()} />}
+          />
         </div>
       )}
 
@@ -818,6 +870,15 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem 2rem', maxWidth: '900px', width: '100%', margin: '0 auto', alignSelf: 'center' }}>
           {reportsLoading ? (
             <ReportsLoadingState />
+          ) : reportsError ? (
+            <AppStateCard
+              eyebrow='Reports unavailable'
+              icon='🗂️'
+              title='Saved reports could not be loaded'
+              description={`${reportsError} Retry to fetch the latest generated reports for this agent.`}
+              tone='error'
+              actions={<StateActionButton label='Retry reports' onClick={() => void loadReports()} />}
+            />
           ) : reports.length === 0 ? (
             <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.4rem 1.2rem', color: 'var(--text-2)', lineHeight: 1.7 }}>
               <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: '1rem', marginBottom: '0.4rem' }}>

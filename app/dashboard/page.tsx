@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api, formatPlanName, getErrorMessage, getUser, logout, refreshCurrentUser } from "@/lib/api";
 import Sidebar from "@/components/Sidebar";
 import AgentCard from "@/components/AgentCard";
+import { AppStateCard, StateActionButton } from "@/components/AppState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { DashboardLoadingState } from "@/components/LoadingSkeleton";
 import UsageStats from "@/components/UsageStats";
@@ -95,6 +96,14 @@ export default function Dashboard() {
   const [runResult, setRunResult] = useState<AgentRunResult | null>(null);
   const [error, setError] = useState("");
 
+  const loadDashboardData = async () => {
+    const res = await api.get("/agents/list?limit=50");
+    setAgents(Array.isArray(res.data) ? res.data : []);
+
+    const schedulesRes = await api.get("/schedules/list?limit=20");
+    setSchedules(Array.isArray(schedulesRes.data) ? schedulesRes.data : []);
+  };
+
   useEffect(() => {
     async function init() {
       const cachedUser = getUser();
@@ -121,11 +130,7 @@ export default function Dashboard() {
       }
 
       try {
-        const res = await api.get("/agents/list?limit=50");
-        setAgents(Array.isArray(res.data) ? res.data : []);
-
-        const schedulesRes = await api.get("/schedules/list?limit=20");
-        setSchedules(Array.isArray(schedulesRes.data) ? schedulesRes.data : []);
+        await loadDashboardData();
       } catch (error) {
         console.error("Failed to fetch agents:", error);
         setError("Failed to load agents.");
@@ -136,6 +141,20 @@ export default function Dashboard() {
 
     init();
   }, [router]);
+
+  const handleRetryDashboard = async () => {
+    setError("");
+    setLoading(true);
+
+    try {
+      await loadDashboardData();
+    } catch (retryError) {
+      console.error("Failed to refresh dashboard:", retryError);
+      setError("We couldn't refresh your dashboard right now.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -851,18 +870,16 @@ export default function Dashboard() {
           </section>
 
           {error && (
-            <div
-              style={{
-                marginBottom: 20,
-                background: "rgba(248,113,113,0.1)",
-                border: "1px solid var(--red)",
-                borderRadius: 12,
-                color: "var(--red)",
-                padding: "12px 16px",
-                fontSize: 14,
-              }}
-            >
-              {error}
+            <div style={{ marginBottom: 20 }}>
+              <AppStateCard
+                eyebrow="Dashboard issue"
+                icon="⚠️"
+                title="We couldn't load the latest dashboard data"
+                description={`${error} You can retry now without leaving the page.`}
+                tone="error"
+                compact
+                actions={<StateActionButton label="Retry dashboard" onClick={() => void handleRetryDashboard()} />}
+              />
             </div>
           )}
 

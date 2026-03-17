@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AppStateCard, StateActionButton } from "@/components/AppState";
 import { api, formatPlanName, normalizePlan } from "@/lib/api";
 
 interface UsageStatsData {
@@ -88,20 +89,24 @@ function MetricBar({
 export default function UsageStats() {
   const [stats, setStats] = useState<UsageStatsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchStats = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await api.get("/usage/stats");
+      setStats(res.data.data);
+    } catch (fetchError) {
+      console.error("Failed to fetch usage stats:", fetchError);
+      setError("We couldn't load your usage right now.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await api.get("/usage/stats");
-        setStats(res.data.data);
-      } catch (error) {
-        console.error("Failed to fetch usage stats:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
+    void fetchStats();
   }, []);
 
   if (loading) {
@@ -112,8 +117,30 @@ export default function UsageStats() {
     );
   }
 
+  if (error) {
+    return (
+      <AppStateCard
+        eyebrow="Usage unavailable"
+        icon="📊"
+        title="Usage details are temporarily unavailable"
+        description="Your account is still active, but Nexora couldn't load the latest usage metrics. Try again to refresh your plan data."
+        tone="error"
+        actions={<StateActionButton label="Retry usage" onClick={() => void fetchStats()} />}
+      />
+    );
+  }
+
   if (!stats) {
-    return null;
+    return (
+      <AppStateCard
+        eyebrow="Usage unavailable"
+        icon="📈"
+        title="No usage data yet"
+        description="Usage totals will appear here after Nexora has enough activity to summarize your current billing period."
+        tone="neutral"
+        compact
+      />
+    );
   }
 
   const shouldWarn =
