@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { formatPlanName, getUser, logout, normalizePlan, refreshCurrentUser, type CurrentUser } from "@/lib/api";
 
 const PLAN_COLORS: Record<string, string> = {
@@ -19,12 +19,18 @@ const NAV_ITEMS = [
   { href: "/admin", label: "🛠  Admin" },
 ];
 
+const subscribe = () => () => {};
+const getServerUserSnapshot = () => null;
+const getClientUserSnapshot = () => getUser();
+
 export default function Sidebar() {
   const pathname = usePathname();
-  const [user, setUser] = useState<CurrentUser | null>(() => getUser());
-  const [canSeeAdmin, setCanSeeAdmin] = useState(false);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const plan = normalizePlan(user?.plan);
+  const cachedUser = useSyncExternalStore(subscribe, getClientUserSnapshot, getServerUserSnapshot);
+  const resolvedUser = user ?? cachedUser;
+  const canSeeAdmin = resolvedUser?.is_admin === true;
+  const plan = normalizePlan(resolvedUser?.plan);
   const navItems = NAV_ITEMS.filter((item) => item.href !== "/admin" || canSeeAdmin);
   const settingsIsActive = pathname === "/settings";
 
@@ -35,14 +41,10 @@ export default function Sidebar() {
       .then((nextUser) => {
         if (active && nextUser) {
           setUser(nextUser);
-          setCanSeeAdmin(nextUser.is_admin === true);
         }
       })
       .catch(() => {
         // Keep cached user data if the refresh fails.
-        if (active) {
-          setCanSeeAdmin(false);
-        }
       });
 
     return () => {
@@ -155,7 +157,7 @@ export default function Sidebar() {
               whiteSpace: "nowrap",
             }}
           >
-            {user?.name || user?.email || "Nexora User"}
+            {resolvedUser?.name || resolvedUser?.email || "Nexora User"}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <span
