@@ -25,6 +25,17 @@ interface Workflow {
   agent_ids: number[]
 }
 
+interface WorkflowTemplate {
+  id: string
+  title: string
+  description: string
+  steps: Array<{
+    name: string
+    agent_type: string
+    description: string
+  }>
+}
+
 interface WorkflowRunStep {
   agent_id: number
   agent_name: string
@@ -44,6 +55,7 @@ export default function WorkflowsPage() {
   const { pushToast, updateToast } = useToast()
   const [agents, setAgents] = useState<Agent[]>([])
   const [workflows, setWorkflows] = useState<Workflow[]>([])
+  const [templates, setTemplates] = useState<WorkflowTemplate[]>([])
   const [selectedAgentId, setSelectedAgentId] = useState('')
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<number | null>(null)
   const [workflowName, setWorkflowName] = useState('')
@@ -54,6 +66,7 @@ export default function WorkflowsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [running, setRunning] = useState(false)
+  const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const loadData = async () => {
@@ -65,8 +78,10 @@ export default function WorkflowsPage() {
         api.get('/agents/list?limit=100'),
         api.get('/workflows/list'),
       ])
+      const templatesRes = await api.get('/workflows/templates')
       setAgents(Array.isArray(agentsRes.data) ? agentsRes.data : [])
       setWorkflows(Array.isArray(workflowsRes.data) ? workflowsRes.data : [])
+      setTemplates(Array.isArray(templatesRes.data) ? templatesRes.data : [])
     } catch (err: unknown) {
       setError(getErrorMessage(err) || "We couldn't load workflows right now.")
     } finally {
@@ -250,6 +265,39 @@ export default function WorkflowsPage() {
     }
   }
 
+  const handleApplyTemplate = async (template: WorkflowTemplate) => {
+    if (applyingTemplateId) return
+
+    setApplyingTemplateId(template.id)
+    const toastId = pushToast({
+      title: `Applying ${template.title}`,
+      description: 'Creating the starter agents and workflow from this template.',
+      tone: 'loading',
+      dismissible: false,
+    })
+
+    try {
+      const { data } = await api.post(`/workflows/templates/${template.id}/apply`)
+      await loadData()
+      handleSelectWorkflow(data)
+      updateToast(toastId, {
+        title: `${template.title} ready`,
+        description: 'The workflow template was added to your workspace and is ready to edit.',
+        tone: 'success',
+        dismissible: true,
+      })
+    } catch (err: unknown) {
+      updateToast(toastId, {
+        title: "Couldn't apply template",
+        description: getErrorMessage(err),
+        tone: 'error',
+        dismissible: true,
+      })
+    } finally {
+      setApplyingTemplateId(null)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       <Sidebar />
@@ -278,7 +326,67 @@ export default function WorkflowsPage() {
               actions={<StateActionButton label='Retry workflows' onClick={() => void loadData()} />}
             />
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) minmax(0, 1fr)', gap: 22 }}>
+            <div style={{ display: 'grid', gap: 22 }}>
+              <section
+                style={{
+                  background: 'var(--bg-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 18,
+                  padding: 18,
+                  display: 'grid',
+                  gap: 16,
+                }}
+              >
+                <div>
+                  <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
+                    Workflow templates
+                  </div>
+                  <div style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.7 }}>
+                    Start with a proven multi-agent flow, then edit the steps or agent order once it is in your workspace.
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+                  {templates.map((template) => (
+                    <div
+                      key={template.id}
+                      style={{
+                        background: 'var(--bg-3)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 16,
+                        padding: 16,
+                        display: 'grid',
+                        gap: 12,
+                      }}
+                    >
+                      <div>
+                        <div style={{ color: 'var(--text)', fontSize: 17, fontWeight: 700, marginBottom: 6 }}>
+                          {template.title}
+                        </div>
+                        <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7 }}>
+                          {template.description}
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {template.steps.map((step, index) => (
+                          <div key={`${template.id}-${index}`} style={{ color: 'var(--text-3)', fontSize: 12, lineHeight: 1.6 }}>
+                            <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Step {index + 1}:</span> {step.name}
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => void handleApplyTemplate(template)}
+                        disabled={applyingTemplateId === template.id}
+                        style={primaryButtonStyle}
+                      >
+                        {applyingTemplateId === template.id ? 'Creating...' : 'Use template'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) minmax(0, 1fr)', gap: 22 }}>
               <section
                 style={{
                   background: 'var(--bg-2)',
@@ -508,6 +616,7 @@ export default function WorkflowsPage() {
                   </div>
                 )}
               </section>
+              </div>
             </div>
           )}
         </div>
