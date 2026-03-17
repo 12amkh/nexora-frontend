@@ -31,10 +31,28 @@ interface User {
   plan: string;
 }
 
+interface Schedule {
+  id: number;
+  agent_id: number;
+  name: string;
+  created_at?: string;
+  last_run_at?: string | null;
+  last_run_status?: string | null;
+}
+
+interface ActivityItem {
+  id: string;
+  title: string;
+  detail: string;
+  timestamp: string;
+  kind: "agent_created" | "schedule_run" | "schedule_created";
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
@@ -72,6 +90,9 @@ export default function Dashboard() {
       try {
         const res = await api.get("/agents/list?limit=50");
         setAgents(Array.isArray(res.data) ? res.data : []);
+
+        const schedulesRes = await api.get("/schedules/list?limit=20");
+        setSchedules(Array.isArray(schedulesRes.data) ? schedulesRes.data : []);
       } catch (error) {
         console.error("Failed to fetch agents:", error);
         setError("Failed to load agents.");
@@ -139,6 +160,64 @@ export default function Dashboard() {
         return b.id - a.id;
       });
   }, [agents, searchQuery, selectedType, sortOrder]);
+
+  const recentActivity = useMemo(() => {
+    const agentNames = new Map<number, string>();
+    agents.forEach((agent) => {
+      agentNames.set(agent.id, agent.name);
+    });
+
+    const items: ActivityItem[] = [];
+
+    agents.forEach((agent) => {
+      if (!agent.created_at) return;
+      items.push({
+        id: `agent-created-${agent.id}`,
+        title: `Created agent ${agent.name}`,
+        detail: `${(agent.config?.agent_type || "custom").replace(/_/g, " ")} agent is ready for chat.`,
+        timestamp: agent.created_at,
+        kind: "agent_created",
+      });
+    });
+
+    schedules.forEach((schedule) => {
+      if (schedule.last_run_at) {
+        const statusLabel = schedule.last_run_status ? schedule.last_run_status.toLowerCase() : "completed";
+        items.push({
+          id: `schedule-run-${schedule.id}-${schedule.last_run_at}`,
+          title: `Schedule ${schedule.name} ran`,
+          detail: `${agentNames.get(schedule.agent_id) || "Agent"} · ${statusLabel}`,
+          timestamp: schedule.last_run_at,
+          kind: "schedule_run",
+        });
+      } else if (schedule.created_at) {
+        items.push({
+          id: `schedule-created-${schedule.id}`,
+          title: `Created schedule ${schedule.name}`,
+          detail: `Automation added for ${agentNames.get(schedule.agent_id) || "an agent"}.`,
+          timestamp: schedule.created_at,
+          kind: "schedule_created",
+        });
+      }
+    });
+
+    return items
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 6);
+  }, [agents, schedules]);
+
+  const formatActivityTime = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Recently";
+
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.max(1, Math.round(diffMs / 60000));
+
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffMinutes < 1440) return `${Math.round(diffMinutes / 60)}h ago`;
+    if (diffMinutes < 10080) return `${Math.round(diffMinutes / 1440)}d ago`;
+    return date.toLocaleDateString();
+  };
 
   if (loading || !user) {
     return (
@@ -439,6 +518,113 @@ export default function Dashboard() {
           </div>
 
           <UsageStats />
+
+          <section style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+                marginBottom: 16,
+              }}
+            >
+              <div>
+                <h2
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "var(--text)",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Recent Activity
+                </h2>
+                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                  The latest useful things happening across your agents and automations.
+                </p>
+              </div>
+            </div>
+
+            {recentActivity.length === 0 ? (
+              <div
+                style={{
+                  background: "var(--bg-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 16,
+                  padding: "20px 22px",
+                  color: "var(--text-2)",
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                }}
+              >
+                No recent activity yet. Create an agent or run a schedule and the latest actions will appear here.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                  gap: 14,
+                  marginBottom: 6,
+                }}
+              >
+                {recentActivity.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      background: "var(--bg-2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 16,
+                      padding: "18px 18px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "5px 10px",
+                          borderRadius: 999,
+                          background: "rgba(217,121,85,0.1)",
+                          color: "var(--accent)",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {item.kind === "agent_created"
+                          ? "Agent"
+                          : item.kind === "schedule_run"
+                            ? "Schedule Run"
+                            : "Schedule"}
+                      </div>
+                      <span style={{ color: "var(--text-3)", fontSize: 12 }}>
+                        {formatActivityTime(item.timestamp)}
+                      </span>
+                    </div>
+
+                    <div style={{ color: "var(--text)", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+                      {item.title}
+                    </div>
+                    <div style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.7 }}>
+                      {item.detail}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
           {error && (
             <div
