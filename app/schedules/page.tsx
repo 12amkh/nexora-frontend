@@ -531,7 +531,7 @@ export default function SchedulesPage() {
       <Sidebar />
 
       {/* ── Main ── */}
-      <main style={{ marginLeft: 220, flex: 1, padding: '40px 48px', maxWidth: 860 }}>
+      <main className='app-shell-main app-shell-main--narrow' style={{}}>
 
         {/* Page header */}
         <div style={{

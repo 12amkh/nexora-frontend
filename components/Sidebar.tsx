@@ -23,6 +23,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<CurrentUser | null>(() => getUser());
   const [canSeeAdmin, setCanSeeAdmin] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const plan = normalizePlan(user?.plan);
   const navItems = NAV_ITEMS.filter((item) => item.href !== "/admin" || canSeeAdmin);
   const settingsIsActive = pathname === "/settings";
@@ -49,24 +50,48 @@ export default function Sidebar() {
     };
   }, []);
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = previousOverflow || "";
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   return (
-    <aside
-      style={{
-        width: 220,
-        minHeight: "100vh",
-        background: "var(--bg-2)",
-        borderRight: "1px solid var(--border)",
-        display: "flex",
-        flexDirection: "column",
-        padding: "20px 16px",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        zIndex: 10,
-      }}
-    >
+    <>
+      <button
+        type="button"
+        className="sidebar-mobile-toggle"
+        aria-label={isOpen ? "Close navigation" : "Open navigation"}
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        {isOpen ? "×" : "☰"}
+      </button>
+      <div className="sidebar-overlay" data-open={isOpen} onClick={() => setIsOpen(false)} />
+      <aside className="sidebar-shell" data-open={isOpen}>
       <Link
         href="/dashboard"
+        onClick={() => setIsOpen(false)}
         style={{
           fontWeight: 800,
           fontSize: "1.2rem",
@@ -90,6 +115,7 @@ export default function Sidebar() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={() => setIsOpen(false)}
             style={{
               display: "block",
               padding: "0.5rem 0.75rem",
@@ -154,6 +180,7 @@ export default function Sidebar() {
 
         <Link
           href="/settings"
+          onClick={() => setIsOpen(false)}
           style={{
             display: "block",
             padding: "0.5rem 0.75rem",
@@ -173,7 +200,10 @@ export default function Sidebar() {
         </Link>
 
         <button
-          onClick={logout}
+          onClick={() => {
+            setIsOpen(false);
+            logout();
+          }}
           style={{
             width: "100%",
             textAlign: "left",
@@ -189,6 +219,7 @@ export default function Sidebar() {
           Sign out
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

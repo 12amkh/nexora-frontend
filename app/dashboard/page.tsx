@@ -281,7 +281,7 @@ export default function Dashboard() {
     return (
       <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
         <Sidebar />
-        <main style={{ marginLeft: 220, flex: 1, padding: "40px 48px", color: "var(--text)" }}>Loading...</main>
+        <main className="app-shell-main" style={{ color: "var(--text)" }}>Loading...</main>
       </div>
     );
   }
@@ -553,7 +553,7 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14, marginBottom: 20 }}>
+            <div className="dashboard-modal-grid">
               {[
                 { label: "Type", value: (selectedAgent.config?.agent_type || "custom").replace(/_/g, " ") },
                 { label: "Tone", value: selectedAgent.config?.tone || "professional" },
@@ -698,17 +698,9 @@ export default function Dashboard() {
         </div>
       )}
       <Sidebar />
-      <main style={{ marginLeft: 220, flex: 1, padding: "40px 48px" }}>
-        <div style={{ maxWidth: 1400 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 20,
-              marginBottom: 28,
-            }}
-          >
+      <main className="app-shell-main">
+        <div className="app-shell-content">
+          <div className="dashboard-header">
             <div>
               <h1
                 style={{
@@ -725,7 +717,7 @@ export default function Dashboard() {
                 Welcome back, {user.name}!
               </p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div className="dashboard-header-actions">
               <span
                 style={{
                   color: "var(--text-2)",

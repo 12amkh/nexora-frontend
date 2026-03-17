@@ -124,12 +124,9 @@ export default function UsageStats() {
 
   return (
     <section
+      className="usage-stats-shell"
       style={{
-        background: "var(--bg-2)",
-        border: "1px solid var(--border)",
-        borderRadius: 16,
-        padding: 24,
-        marginBottom: 28,
+        width: "100%",
       }}
     >
       <div style={{ marginBottom: 24 }}>
@@ -154,10 +151,9 @@ export default function UsageStats() {
       </div>
 
       <div
+        className="usage-stats-grid"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 24,
+          width: "100%",
         }}
       >
         <MetricBar
@@ -192,7 +188,7 @@ export default function UsageStats() {
             fontSize: 14,
           }}
         >
-          You're approaching your plan limits. Upgrade to continue using Nexora without restrictions.
+          You&apos;re approaching your plan limits. Upgrade to continue using Nexora without restrictions.
           <Link
             href="/dashboard/upgrade"
             style={{

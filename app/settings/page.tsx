@@ -214,7 +214,7 @@ export default function SettingsPage() {
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       <Sidebar />
 
-      <main style={pageStyle}>
+      <main className='app-shell-main' style={pageStyle}>
         <section style={heroCardStyle}>
           <div style={heroContentStyle}>
             <div>
@@ -764,11 +764,7 @@ function modePreviewStyle(background: string): CSSProperties {
   }
 }
 
-const pageStyle: CSSProperties = {
-  flex: 1,
-  marginLeft: 220,
-  padding: '36px 40px 56px',
-}
+const pageStyle: CSSProperties = {}
 
 const heroCardStyle: CSSProperties = {
   background:
@@ -831,7 +827,7 @@ const loadingBadgeStyle: CSSProperties = {
 
 const contentGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.8fr) minmax(280px, 0.9fr)',
+  gridTemplateColumns: 'var(--settings-content-columns)',
   gap: 24,
   alignItems: 'start',
 }
@@ -844,7 +840,7 @@ const mainColumnStyle: CSSProperties = {
 const sideColumnStyle: CSSProperties = {
   display: 'grid',
   gap: 24,
-  position: 'sticky',
+  position: 'var(--settings-side-position)' as CSSProperties['position'],
   top: 24,
 }
 
@@ -1048,7 +1044,7 @@ const inactiveBadgeStyle: CSSProperties = {
 
 const previewGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
+  gridTemplateColumns: 'var(--settings-theme-preview-columns)',
   gap: 10,
 }
 
@@ -1067,7 +1063,7 @@ const statsPanelStyle: CSSProperties = {
 
 const miniStatsGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gridTemplateColumns: 'var(--settings-mini-stats-columns)',
   gap: 12,
 }
 
