@@ -1,9 +1,18 @@
 // lib/api.ts
 import axios from 'axios'
+import {
+  DEFAULT_THEME_FAMILY,
+  DEFAULT_THEME_MODE,
+  normalizeThemeFamily,
+  normalizeThemeMode,
+  type ThemeFamily,
+  type ThemeMode,
+} from '@/lib/themes'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const USER_STORAGE_KEY = 'user'
-const THEME_STORAGE_KEY = 'nexora_theme'
+const THEME_MODE_STORAGE_KEY = 'nexora_theme_mode'
+const THEME_FAMILY_STORAGE_KEY = 'nexora_theme_family'
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -57,9 +66,10 @@ export const refreshCurrentUser = async () => {
   })
 
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data))
-  if (data?.theme) {
-    localStorage.setItem(THEME_STORAGE_KEY, data.theme)
-  }
+  setStoredThemePreferences({
+    theme: data?.theme,
+    theme_family: data?.theme_family,
+  })
   return data
 }
 
@@ -72,21 +82,40 @@ export const logout = () => {
 
 export const getStoredTheme = () => {
   if (typeof window === 'undefined') return null
-  return localStorage.getItem(THEME_STORAGE_KEY)
+  return normalizeThemeMode(localStorage.getItem(THEME_MODE_STORAGE_KEY))
 }
 
-export const setStoredTheme = (theme: 'dark' | 'light') => {
+export const setStoredTheme = (theme: ThemeMode) => {
   if (typeof window === 'undefined') return
-  localStorage.setItem(THEME_STORAGE_KEY, theme)
+  localStorage.setItem(THEME_MODE_STORAGE_KEY, normalizeThemeMode(theme))
+}
+
+export const getStoredThemeFamily = () => {
+  if (typeof window === 'undefined') return null
+  return normalizeThemeFamily(localStorage.getItem(THEME_FAMILY_STORAGE_KEY))
+}
+
+export const setStoredThemeFamily = (themeFamily: ThemeFamily) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(THEME_FAMILY_STORAGE_KEY, normalizeThemeFamily(themeFamily))
+}
+
+export const setStoredThemePreferences = (preferences: {
+  theme?: unknown
+  theme_family?: unknown
+}) => {
+  if (typeof window === 'undefined') return
+  setStoredTheme(normalizeThemeMode(preferences.theme ?? DEFAULT_THEME_MODE))
+  setStoredThemeFamily(normalizeThemeFamily(preferences.theme_family ?? DEFAULT_THEME_FAMILY))
 }
 
 export const setStoredUser = (user: Record<string, unknown>) => {
   if (typeof window === 'undefined') return
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
-  const theme = user?.theme
-  if (typeof theme === 'string') {
-    localStorage.setItem(THEME_STORAGE_KEY, theme)
-  }
+  setStoredThemePreferences({
+    theme: user?.theme,
+    theme_family: user?.theme_family,
+  })
 }
 
 export const normalizePlan = (plan: unknown) => {

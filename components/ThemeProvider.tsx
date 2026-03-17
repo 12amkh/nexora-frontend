@@ -1,55 +1,78 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api, getStoredTheme, getUser, setStoredTheme, setStoredUser } from "@/lib/api";
-
-type Theme = "dark" | "light";
+import {
+  api,
+  getStoredTheme,
+  getStoredThemeFamily,
+  getUser,
+  setStoredTheme,
+  setStoredThemeFamily,
+  setStoredUser,
+} from "@/lib/api";
+import {
+  DEFAULT_THEME_FAMILY,
+  DEFAULT_THEME_MODE,
+  normalizeThemeFamily,
+  normalizeThemeMode,
+  type ThemeFamily,
+  type ThemeMode,
+} from "@/lib/themes";
 
 interface ThemeContextValue {
-  theme: Theme;
-  setTheme: (theme: Theme) => Promise<void>;
+  themeMode: ThemeMode;
+  themeFamily: ThemeFamily;
+  theme: ThemeMode;
+  setTheme: (theme: ThemeMode) => Promise<void>;
+  setThemeFamily: (family: ThemeFamily) => Promise<void>;
   toggleTheme: () => Promise<void>;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const resolveInitialTheme = (): Theme => {
-  if (typeof window === "undefined") return "dark";
+const resolveInitialThemeMode = (): ThemeMode => {
+  if (typeof window === "undefined") return DEFAULT_THEME_MODE;
+  return normalizeThemeMode(getStoredTheme() ?? getUser()?.theme ?? DEFAULT_THEME_MODE);
+};
 
-  const storedTheme = getStoredTheme();
-  if (storedTheme === "dark" || storedTheme === "light") {
-    return storedTheme;
-  }
-
-  const userTheme = getUser()?.theme;
-  if (userTheme === "dark" || userTheme === "light") {
-    return userTheme;
-  }
-
-  return "dark";
+const resolveInitialThemeFamily = (): ThemeFamily => {
+  if (typeof window === "undefined") return DEFAULT_THEME_FAMILY;
+  return normalizeThemeFamily(getStoredThemeFamily() ?? getUser()?.theme_family ?? DEFAULT_THEME_FAMILY);
 };
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(resolveInitialTheme);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(resolveInitialThemeMode);
+  const [themeFamily, setThemeFamilyState] = useState<ThemeFamily>(resolveInitialThemeFamily);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    setStoredTheme(theme);
-  }, [theme]);
+    document.documentElement.dataset.themeMode = themeMode;
+    document.documentElement.dataset.themeFamily = themeFamily;
+    setStoredTheme(themeMode);
+    setStoredThemeFamily(themeFamily);
+  }, [themeFamily, themeMode]);
 
-  const persistTheme = async (nextTheme: Theme) => {
-    setThemeState(nextTheme);
+  const persistThemePreferences = async (nextThemeMode: ThemeMode, nextThemeFamily: ThemeFamily) => {
+    setThemeMode(nextThemeMode);
+    setThemeFamilyState(nextThemeFamily);
 
     const currentUser = getUser();
     if (!currentUser) return;
 
-    const optimisticUser = { ...currentUser, theme: nextTheme };
+    const optimisticUser = {
+      ...currentUser,
+      theme: nextThemeMode,
+      theme_family: nextThemeFamily,
+    };
     setStoredUser(optimisticUser);
 
     try {
-      const { data } = await api.put("/users/theme", { theme: nextTheme });
+      const { data } = await api.put("/users/theme", {
+        theme: nextThemeMode,
+        theme_family: nextThemeFamily,
+      });
       setStoredUser(data);
-      setThemeState(data.theme);
+      setThemeMode(normalizeThemeMode(data.theme));
+      setThemeFamilyState(normalizeThemeFamily(data.theme_family));
     } catch {
       // Keep the optimistic theme locally even if the save fails.
     }
@@ -57,11 +80,15 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
 
   const value = useMemo<ThemeContextValue>(
     () => ({
-      theme,
-      setTheme: persistTheme,
-      toggleTheme: () => persistTheme(theme === "dark" ? "light" : "dark"),
+      themeMode,
+      themeFamily,
+      theme: themeMode,
+      setTheme: (nextThemeMode) => persistThemePreferences(nextThemeMode, themeFamily),
+      setThemeFamily: (nextThemeFamily) => persistThemePreferences(themeMode, nextThemeFamily),
+      toggleTheme: () =>
+        persistThemePreferences(themeMode === "dark" ? "light" : "dark", themeFamily),
     }),
-    [theme]
+    [themeFamily, themeMode]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

@@ -1,11 +1,13 @@
 "use client";
 
 import { useTheme } from "@/components/ThemeProvider";
+import { getThemeDefinition } from "@/lib/themes";
 
 export default function ThemeToggle() {
-  const { theme, toggleTheme } = useTheme();
-  const label = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
-  const actionLabel = theme === "dark" ? "Light" : "Dark";
+  const { themeMode, themeFamily, toggleTheme } = useTheme();
+  const label = themeMode === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  const actionLabel = themeMode === "dark" ? "Light" : "Dark";
+  const themeName = getThemeDefinition(themeFamily).name;
 
   return (
     <button
@@ -40,13 +42,14 @@ export default function ThemeToggle() {
           borderRadius: "50%",
           display: "grid",
           placeItems: "center",
-          background: theme === "dark" ? "rgba(245,239,227,0.12)" : "rgba(23,23,23,0.08)",
+          background:
+            themeMode === "dark" ? "rgba(245,239,227,0.12)" : "rgba(23,23,23,0.08)",
           fontSize: 13,
         }}
       >
-        {theme === "dark" ? "☀" : "☾"}
+        {themeMode === "dark" ? "☀" : "☾"}
       </span>
-      <span>{actionLabel}</span>
+      <span>{themeName} · {actionLabel}</span>
     </button>
   );
 }

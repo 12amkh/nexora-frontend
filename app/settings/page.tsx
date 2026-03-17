@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { api, formatPlanName, getUser, logout, getErrorMessage, normalizePlan, refreshCurrentUser, setStoredUser } from '@/lib/api'
 import { useTheme } from '@/components/ThemeProvider'
 import UsageStats from '@/components/UsageStats'
+import { THEME_FAMILIES, getThemeDefinition, type ThemeFamily, type ThemeMode } from '@/lib/themes'
 
 const PLAN_COLORS: Record<string, string> = {
   free: '#8888a0', starter: '#34d399', pro: '#6c63ff', business: '#f59e0b', enterprise: '#ec4899',
@@ -24,8 +25,8 @@ interface Stats {
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { theme, setTheme } = useTheme()
-  const [user, setUser] = useState<{ email?: string; name?: string; plan?: string; theme?: string } | null>(null)
+  const { themeMode, themeFamily, setTheme, setThemeFamily } = useTheme()
+  const [user, setUser] = useState<{ email?: string; name?: string; plan?: string; theme?: string; theme_family?: string } | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   
   // Profile update form
@@ -94,19 +95,40 @@ export default function SettingsPage() {
     }
   }
 
-  const handleThemeChange = async (nextTheme: 'dark' | 'light') => {
-    if (nextTheme === theme) return
+  const handleThemeModeChange = async (nextThemeMode: ThemeMode) => {
+    if (nextThemeMode === themeMode) return
 
     setSavingTheme(true)
     setErrorMsg('')
     setSuccessMsg('')
 
     try {
-      await setTheme(nextTheme)
-      const updatedUser = { ...user, theme: nextTheme }
+      await setTheme(nextThemeMode)
+      const updatedUser = { ...user, theme: nextThemeMode, theme_family: themeFamily }
       setUser(updatedUser)
       setStoredUser(updatedUser)
-      setSuccessMsg('Theme updated successfully.')
+      setSuccessMsg('Theme mode updated successfully.')
+      setTimeout(() => setSuccessMsg(''), 3000)
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err))
+    } finally {
+      setSavingTheme(false)
+    }
+  }
+
+  const handleThemeFamilyChange = async (nextThemeFamily: ThemeFamily) => {
+    if (nextThemeFamily === themeFamily) return
+
+    setSavingTheme(true)
+    setErrorMsg('')
+    setSuccessMsg('')
+
+    try {
+      await setThemeFamily(nextThemeFamily)
+      const updatedUser = { ...user, theme: themeMode, theme_family: nextThemeFamily }
+      setUser(updatedUser)
+      setStoredUser(updatedUser)
+      setSuccessMsg('Theme family updated successfully.')
       setTimeout(() => setSuccessMsg(''), 3000)
     } catch (err) {
       setErrorMsg(getErrorMessage(err))
@@ -311,38 +333,107 @@ export default function SettingsPage() {
 
           <section style={cardStyle}>
             <h2 style={sectionTitleStyle}>Appearance</h2>
-            <p style={sectionDescStyle}>Choose a saved theme for your account.</p>
+            <p style={sectionDescStyle}>Choose a theme family, then let the global Light/Dark switch flip that family between its two variants.</p>
 
-            <div style={{ display: 'flex', gap: 16, marginTop: 20, flexWrap: 'wrap' }}>
-              {[
-                { value: 'dark', title: 'Claude Dark', desc: 'Ink-black background with soft contrast.' },
-                { value: 'light', title: 'Claude Light', desc: 'Warm paper tones with darker text.' },
-              ].map((option) => {
-                const active = theme === option.value
-                return (
-                  <button
-                    key={option.value}
-                    onClick={() => void handleThemeChange(option.value as 'dark' | 'light')}
-                    disabled={savingTheme}
-                    style={{
-                      flex: '1 1 240px',
-                      textAlign: 'left',
-                      padding: 18,
-                      borderRadius: 12,
-                      border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                      background: active ? 'var(--accent-g)' : 'var(--bg)',
-                      cursor: savingTheme ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    <div style={{ color: 'var(--text)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
-                      {option.title}
-                    </div>
-                    <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.6 }}>
-                      {option.desc}
-                    </div>
-                  </button>
-                )
-              })}
+            <div style={{ marginTop: 20 }}>
+              <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Theme mode</div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {[
+                  { value: 'dark', title: 'Dark', desc: 'Use the darker version of your selected theme.' },
+                  { value: 'light', title: 'Light', desc: 'Use the lighter version of your selected theme.' },
+                ].map((option) => {
+                  const active = themeMode === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => void handleThemeModeChange(option.value as ThemeMode)}
+                      disabled={savingTheme}
+                      style={{
+                        flex: '1 1 220px',
+                        textAlign: 'left',
+                        padding: 16,
+                        borderRadius: 12,
+                        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                        background: active ? 'var(--accent-g)' : 'var(--bg)',
+                        cursor: savingTheme ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <div style={{ color: 'var(--text)', fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
+                        {option.title}
+                      </div>
+                      <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.6 }}>
+                        {option.desc}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 24 }}>
+              <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Theme family</div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                {THEME_FAMILIES.map((option) => {
+                  const active = themeFamily === option.id
+                  const preview = getThemeDefinition(option.id)
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => void handleThemeFamilyChange(option.id)}
+                      disabled={savingTheme}
+                      style={{
+                        flex: '1 1 260px',
+                        textAlign: 'left',
+                        padding: 18,
+                        borderRadius: 14,
+                        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                        background: active ? 'var(--accent-g)' : 'var(--bg)',
+                        cursor: savingTheme ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                        <div>
+                          <div style={{ color: 'var(--text)', fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
+                            {option.name}
+                          </div>
+                          <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.5 }}>
+                            {option.description}
+                          </div>
+                        </div>
+                        {active && (
+                          <div style={{
+                            padding: '4px 8px',
+                            borderRadius: 999,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: '#fff',
+                            background: 'var(--accent)',
+                          }}>
+                            Active
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <ThemePreviewCard
+                          label="Light"
+                          bg={preview.light.bg}
+                          surface={preview.light.surface}
+                          accent={preview.light.accent}
+                          text={preview.light.text}
+                        />
+                        <ThemePreviewCard
+                          label="Dark"
+                          bg={preview.dark.bg}
+                          surface={preview.dark.surface}
+                          accent={preview.dark.accent}
+                          text={preview.dark.text}
+                        />
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </section>
 
@@ -408,6 +499,46 @@ function StatBox({ label, value }: { label: string; value: string }) {
     <div>
       <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>{value}</div>
+    </div>
+  )
+}
+
+function ThemePreviewCard({
+  label,
+  bg,
+  surface,
+  accent,
+  text,
+}: {
+  label: string
+  bg: string
+  surface: string
+  accent: string
+  text: string
+}) {
+  return (
+    <div
+      style={{
+        borderRadius: 12,
+        padding: 12,
+        background: bg,
+        border: `1px solid ${surface}`,
+      }}
+    >
+      <div style={{ color: text, fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
+        {label}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 8 }}>
+        <div style={{ borderRadius: 10, background: surface, minHeight: 62, padding: 10 }}>
+          <div style={{ width: 34, height: 6, borderRadius: 999, background: accent, marginBottom: 8 }} />
+          <div style={{ width: '75%', height: 6, borderRadius: 999, background: `${text}20`, marginBottom: 6 }} />
+          <div style={{ width: '55%', height: 6, borderRadius: 999, background: `${text}14` }} />
+        </div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ borderRadius: 10, minHeight: 27, background: accent }} />
+          <div style={{ borderRadius: 10, minHeight: 27, background: `${text}12` }} />
+        </div>
+      </div>
     </div>
   )
 }

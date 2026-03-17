@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatPlanName, getUser, logout, normalizePlan, refreshCurrentUser } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
+import { getThemeDefinition } from "@/lib/themes";
 
 const PLAN_COLORS: Record<string, string> = {
   free: "#8888a0",
@@ -25,7 +26,8 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<{ email?: string; name?: string; plan?: string } | null>(() => getUser());
   const plan = normalizePlan(user?.plan);
-  const { theme, toggleTheme } = useTheme();
+  const { themeMode, themeFamily, toggleTheme } = useTheme();
+  const themeName = getThemeDefinition(themeFamily).name;
 
   useEffect(() => {
     let active = true;
@@ -163,7 +165,7 @@ export default function Sidebar() {
             marginBottom: 4,
           }}
         >
-          {theme === "dark" ? "Light theme" : "Dark theme"}
+          {themeMode === "dark" ? `Light ${themeName}` : `Dark ${themeName}`}
         </button>
 
         <button
