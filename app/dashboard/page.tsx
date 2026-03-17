@@ -59,6 +59,12 @@ interface AgentRunResult {
   response: string;
 }
 
+interface PerformanceInsightCard {
+  label: string;
+  value: string;
+  detail: string;
+}
+
 function buildDefaultRunPrompt(agent: Agent) {
   const type = agent.config?.agent_type || "custom";
 
@@ -323,6 +329,74 @@ export default function Dashboard() {
     return items
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 6);
+  }, [agents, schedules]);
+
+  const performanceInsights = useMemo(() => {
+    const agentMap = new Map<number, Agent>();
+    agents.forEach((agent) => {
+      agentMap.set(agent.id, agent);
+    });
+
+    const schedulesWithRuns = schedules.filter((schedule) => Boolean(schedule.last_run_at));
+    const latestRun = [...schedulesWithRuns].sort((a, b) => {
+      return new Date(b.last_run_at ?? 0).getTime() - new Date(a.last_run_at ?? 0).getTime();
+    })[0];
+
+    const agentActivityCounts = new Map<number, number>();
+    schedulesWithRuns.forEach((schedule) => {
+      agentActivityCounts.set(schedule.agent_id, (agentActivityCounts.get(schedule.agent_id) ?? 0) + 1);
+    });
+
+    const mostUsedAgentEntry = [...agentActivityCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+    const mostUsedAgent = mostUsedAgentEntry ? agentMap.get(mostUsedAgentEntry[0]) : null;
+
+    const mostActiveSchedule = [...schedulesWithRuns].sort((a, b) => {
+      return new Date(b.last_run_at ?? 0).getTime() - new Date(a.last_run_at ?? 0).getTime();
+    })[0];
+
+    const healthySchedules = schedules.filter((schedule) => schedule.last_run_status?.toLowerCase() === "success").length;
+
+    const cards: PerformanceInsightCard[] = [
+      {
+        label: "Tracked schedule runs",
+        value: String(schedulesWithRuns.length),
+        detail:
+          schedulesWithRuns.length > 0
+            ? "Schedules with at least one recorded run on this dashboard."
+            : "Run a schedule once to start seeing tracked performance signals here.",
+      },
+      {
+        label: "Last recorded run",
+        value: latestRun?.last_run_at ? formatActivityTime(latestRun.last_run_at) : "No runs yet",
+        detail: latestRun
+          ? `${latestRun.name} · ${agentMap.get(latestRun.agent_id)?.name || "Agent"}`
+          : "No schedule has reported a recent run yet.",
+      },
+      {
+        label: "Most used agent",
+        value: mostUsedAgent?.name || "Not enough data",
+        detail: mostUsedAgent && mostUsedAgentEntry
+          ? `Seen across ${mostUsedAgentEntry[1]} tracked schedule ${mostUsedAgentEntry[1] === 1 ? "run" : "runs"}.`
+          : "This will appear after your schedules begin running.",
+      },
+      {
+        label: "Most active schedule",
+        value: mostActiveSchedule?.name || "Not enough data",
+        detail: mostActiveSchedule?.last_run_at
+          ? `Last completed ${formatActivityTime(mostActiveSchedule.last_run_at)}${mostActiveSchedule.last_run_status ? ` · ${mostActiveSchedule.last_run_status}` : ""}.`
+          : healthySchedules > 0
+            ? `${healthySchedules} schedules reported successful runs recently.`
+            : "Your schedule activity will surface here automatically.",
+      },
+    ];
+
+    return {
+      cards,
+      summary:
+        schedulesWithRuns.length > 0
+          ? `${schedulesWithRuns.length} schedules have recorded activity so far, with ${healthySchedules} recent success${healthySchedules === 1 ? "" : "es"}.`
+          : "Performance insights grow automatically as your scheduled automations begin running.",
+    };
   }, [agents, schedules]);
 
   const formatActivityTime = (value: string) => {
@@ -769,6 +843,114 @@ export default function Dashboard() {
           </div>
 
           <UsageStats />
+
+          <section style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+                marginBottom: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h2
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "var(--text)",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Agent Performance Insights
+                </h2>
+                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                  A quick read on which agents and schedules are seeing the most tracked activity.
+                </p>
+              </div>
+              <Link
+                href="/schedules"
+                style={{
+                  color: "var(--accent)",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                View schedules
+              </Link>
+            </div>
+
+            <div
+              style={{
+                background: "var(--bg-2)",
+                border: "1px solid var(--border)",
+                borderRadius: 18,
+                padding: 18,
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 14,
+                  marginBottom: 16,
+                }}
+              >
+                {performanceInsights.cards.map((card) => (
+                  <div
+                    key={card.label}
+                    style={{
+                      background: "var(--bg)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 16,
+                      padding: "16px 16px 15px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "var(--text-3)",
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {card.label}
+                    </div>
+                    <div
+                      style={{
+                        color: "var(--text)",
+                        fontSize: 22,
+                        fontWeight: 700,
+                        letterSpacing: "-0.03em",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {card.value}
+                    </div>
+                    <div style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.65 }}>
+                      {card.detail}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div
+                style={{
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: 14,
+                  color: "var(--text-2)",
+                  fontSize: 13,
+                  lineHeight: 1.7,
+                }}
+              >
+                {performanceInsights.summary}
+              </div>
+            </div>
+          </section>
 
           <section style={{ marginBottom: 28 }}>
             <div
