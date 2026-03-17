@@ -331,6 +331,19 @@ export default function Dashboard() {
       .slice(0, 6);
   }, [agents, schedules]);
 
+  const formatActivityTime = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Recently";
+
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.max(1, Math.round(diffMs / 60000));
+
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffMinutes < 1440) return `${Math.round(diffMinutes / 60)}h ago`;
+    if (diffMinutes < 10080) return `${Math.round(diffMinutes / 1440)}d ago`;
+    return date.toLocaleDateString();
+  };
+
   const performanceInsights = useMemo(() => {
     const agentMap = new Map<number, Agent>();
     agents.forEach((agent) => {
@@ -398,19 +411,6 @@ export default function Dashboard() {
           : "Performance insights grow automatically as your scheduled automations begin running.",
     };
   }, [agents, schedules]);
-
-  const formatActivityTime = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "Recently";
-
-    const diffMs = Date.now() - date.getTime();
-    const diffMinutes = Math.max(1, Math.round(diffMs / 60000));
-
-    if (diffMinutes < 60) return `${diffMinutes}m ago`;
-    if (diffMinutes < 1440) return `${Math.round(diffMinutes / 60)}h ago`;
-    if (diffMinutes < 10080) return `${Math.round(diffMinutes / 1440)}d ago`;
-    return date.toLocaleDateString();
-  };
 
   if (loading || !user) {
     return <DashboardLoadingState />;
