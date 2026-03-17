@@ -1135,8 +1135,9 @@ export default function SchedulesPage() {
                       padding: '14px 20px 16px',
                       borderRadius: '0 0 12px 12px',
                       background: tone.bg,
-                      border: `1px solid ${tone.border}`,
-                      borderTop: 'none',
+                      borderLeft: `1px solid ${tone.border}`,
+                      borderRight: `1px solid ${tone.border}`,
+                      borderBottom: `1px solid ${tone.border}`,
                     }}>
                       <div style={{
                         display: 'flex',
