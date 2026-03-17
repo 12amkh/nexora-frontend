@@ -8,6 +8,7 @@ import Sidebar from "@/components/Sidebar";
 import AgentCard from "@/components/AgentCard";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import UsageStats from "@/components/UsageStats";
+import RichContent from "@/components/RichContent";
 
 interface Agent {
   id: number;
@@ -48,6 +49,34 @@ interface ActivityItem {
   kind: "agent_created" | "schedule_run" | "schedule_created";
 }
 
+interface AgentRunResult {
+  agentId: number;
+  prompt: string;
+  response: string;
+}
+
+function buildDefaultRunPrompt(agent: Agent) {
+  const type = agent.config?.agent_type || "custom";
+
+  if (type === "news_monitor") {
+    return "Give me a concise trends report with the most important developments and what matters most right now.";
+  }
+  if (type === "competitor_analyst") {
+    return "Give me a quick competitor analysis with the main positioning, product strengths, and risks to watch.";
+  }
+  if (type === "data_interpreter") {
+    return "Give me a structured interpretation of the key insights, patterns, and actions I should take from the available context.";
+  }
+  if (type === "content_writer") {
+    return "Draft a short high-quality content outline with a strong hook, key points, and a call to action.";
+  }
+  if (type === "web_researcher") {
+    return "Research this topic and give me a clear summary with the most useful takeaways and sources.";
+  }
+
+  return "Give me a clear, structured response showing what you are best at and the most useful next steps.";
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -57,9 +86,11 @@ export default function Dashboard() {
   const [selectedType, setSelectedType] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [loading, setLoading] = useState(true);
+  const [runningAgentId, setRunningAgentId] = useState<number | null>(null);
   const [deletingAgentId, setDeletingAgentId] = useState<number | null>(null);
   const [agentPendingDelete, setAgentPendingDelete] = useState<Agent | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [runResult, setRunResult] = useState<AgentRunResult | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -116,6 +147,32 @@ export default function Dashboard() {
 
   const handleInspectAgent = (agent: Agent) => {
     setSelectedAgent(agent);
+  };
+
+  const handleRunAgent = async (agent: Agent) => {
+    if (runningAgentId) return;
+
+    const prompt = buildDefaultRunPrompt(agent);
+    setRunningAgentId(agent.id);
+    setSelectedAgent(agent);
+    setError("");
+
+    try {
+      const { data } = await api.post("/chat/run", {
+        agent_id: agent.id,
+        message: prompt,
+      });
+
+      setRunResult({
+        agentId: agent.id,
+        prompt,
+        response: data.message,
+      });
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setRunningAgentId(null);
+    }
   };
 
   const confirmDeleteAgent = async () => {
@@ -353,11 +410,11 @@ export default function Dashboard() {
                   <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
                     {item.label}
                   </div>
-                  <div style={{ color: "var(--text)", fontSize: 15, fontWeight: 600, textTransform: "capitalize" }}>
-                    {item.value}
+                    <div style={{ color: "var(--text)", fontSize: 15, fontWeight: 600, textTransform: "capitalize" }}>
+                      {item.value}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
 
             <div
@@ -407,6 +464,77 @@ export default function Dashboard() {
                   {selectedAgent.created_at ? new Date(selectedAgent.created_at).toLocaleString() : "Recently created"}
                 </div>
               </div>
+            </div>
+
+            <div
+              style={{
+                background: "var(--bg-3)",
+                border: "1px solid var(--border)",
+                borderRadius: 18,
+                padding: 18,
+                marginBottom: 22,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                  marginBottom: 12,
+                }}
+              >
+                <div>
+                  <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                    Quick Run
+                  </div>
+                  <div style={{ color: "var(--text-2)", fontSize: 14 }}>
+                    Run this agent right now with a default prompt, without leaving the dashboard.
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRunAgent(selectedAgent)}
+                  disabled={runningAgentId === selectedAgent.id}
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: 12,
+                    border: "none",
+                    background: "var(--accent)",
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: runningAgentId === selectedAgent.id ? "not-allowed" : "pointer",
+                    opacity: runningAgentId === selectedAgent.id ? 0.8 : 1,
+                    minWidth: 110,
+                  }}
+                >
+                  {runningAgentId === selectedAgent.id ? "Running..." : "Run agent"}
+                </button>
+              </div>
+
+              {runResult?.agentId === selectedAgent.id && (
+                <div
+                  style={{
+                    background: "var(--bg)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 16,
+                    padding: 16,
+                  }}
+                >
+                  <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                    Default Prompt
+                  </div>
+                  <div style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
+                    {runResult.prompt}
+                  </div>
+                  <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                    Response
+                  </div>
+                  <div style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.8 }}>
+                    <RichContent content={runResult.response} />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" }}>
@@ -950,8 +1078,10 @@ export default function Dashboard() {
                         key={agent.id}
                         agent={agent}
                         onInspect={handleInspectAgent}
+                        onRun={handleRunAgent}
                         onDelete={handleDeleteAgent}
                         deleting={deletingAgentId === agent.id}
+                        running={runningAgentId === agent.id}
                       />
                     ))}
                   </div>

@@ -22,11 +22,13 @@ interface Agent {
 interface AgentCardProps {
   agent: Agent;
   onInspect?: (agent: Agent) => void;
+  onRun?: (agent: Agent) => void | Promise<void>;
   onDelete?: (agent: Agent) => void | Promise<void>;
   deleting?: boolean;
+  running?: boolean;
 }
 
-export default function AgentCard({ agent, onInspect, onDelete, deleting = false }: AgentCardProps) {
+export default function AgentCard({ agent, onInspect, onRun, onDelete, deleting = false, running = false }: AgentCardProps) {
   const router = useRouter();
   const agentType = (agent.config?.agent_type || "custom").replace(/_/g, " ");
   const tone = agent.config?.tone || "professional";
@@ -48,6 +50,12 @@ export default function AgentCard({ agent, onInspect, onDelete, deleting = false
     event.preventDefault();
     event.stopPropagation();
     onInspect?.(agent);
+  };
+
+  const handleRunClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onRun?.(agent);
   };
 
   const handleCardOpen = () => {
@@ -278,22 +286,22 @@ export default function AgentCard({ agent, onInspect, onDelete, deleting = false
           >
             Edit
           </Link>
-          <Link
-            href={`/agents/${agent.id}`}
-            onClick={(event) => event.stopPropagation()}
+          <button
+            onClick={handleRunClick}
+            disabled={running}
             style={{
               padding: "9px 14px",
               borderRadius: 10,
               background: "transparent",
               border: "1px solid var(--border)",
-              color: "var(--text-2)",
-              textDecoration: "none",
+              color: running ? "var(--text-3)" : "var(--text-2)",
               fontSize: 13,
               fontWeight: 600,
+              cursor: running ? "not-allowed" : "pointer",
             }}
           >
-            Run
-          </Link>
+            {running ? "Running..." : "Run"}
+          </button>
         </div>
         <span style={{ fontSize: 12, color: "var(--text-3)" }}>
           Ready for follow-up chat
