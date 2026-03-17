@@ -15,6 +15,7 @@ interface MarketplaceItem {
   description: string
   agent_type: string
   owner_name: string
+  created_at?: string
   config: {
     tone?: string
     response_length?: string
@@ -23,11 +24,17 @@ interface MarketplaceItem {
   }
 }
 
+const MARKETPLACE_FAVORITES_KEY = 'nexora_marketplace_favorites'
+
+type SortOption = 'newest' | 'title' | 'favorites'
+
 export default function MarketplacePage() {
   const router = useRouter()
   const { pushToast, updateToast } = useToast()
   const [items, setItems] = useState<MarketplaceItem[]>([])
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<SortOption>('newest')
+  const [favoriteIds, setFavoriteIds] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [importingItemId, setImportingItemId] = useState<number | null>(null)
@@ -52,6 +59,21 @@ export default function MarketplacePage() {
       router.push('/login')
       return
     }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = window.localStorage.getItem(MARKETPLACE_FAVORITES_KEY)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (Array.isArray(parsed)) {
+            setFavoriteIds(parsed.map((value) => Number(value)).filter((value) => Number.isFinite(value)))
+          }
+        }
+      } catch {
+        setFavoriteIds([])
+      }
+    }
+
     void loadMarketplace()
   }, [loadMarketplace, router])
 
@@ -61,6 +83,43 @@ export default function MarketplacePage() {
     }
     return `${items.length} public ${items.length === 1 ? 'template is' : 'templates are'} available to import right now.`
   }, [items])
+
+  const sortedItems = useMemo(() => {
+    const nextItems = [...items]
+
+    if (sortBy === 'title') {
+      return nextItems.sort((a, b) => a.title.localeCompare(b.title))
+    }
+
+    if (sortBy === 'favorites') {
+      return nextItems.sort((a, b) => {
+        const aFavorite = favoriteIds.includes(a.id) ? 1 : 0
+        const bFavorite = favoriteIds.includes(b.id) ? 1 : 0
+        if (aFavorite !== bFavorite) return bFavorite - aFavorite
+        return a.title.localeCompare(b.title)
+      })
+    }
+
+    return nextItems.sort((a, b) => {
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0
+      return bTime - aTime
+    })
+  }, [favoriteIds, items, sortBy])
+
+  const toggleFavorite = (itemId: number) => {
+    setFavoriteIds((current) => {
+      const next = current.includes(itemId)
+        ? current.filter((id) => id !== itemId)
+        : [...current, itemId]
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(MARKETPLACE_FAVORITES_KEY, JSON.stringify(next))
+      }
+
+      return next
+    })
+  }
 
   const handleImport = async (item: MarketplaceItem) => {
     if (importingItemId) return
@@ -170,6 +229,36 @@ export default function MarketplacePage() {
                 >
                   Search
                 </button>
+                <label
+                  style={{
+                    display: 'block',
+                    minWidth: 180,
+                    background: 'var(--bg-3)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 12,
+                    padding: '10px 14px',
+                  }}
+                >
+                  <div style={{ color: 'var(--text-3)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                    Sort by
+                  </div>
+                  <select
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value as SortOption)}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      color: 'var(--text)',
+                      fontSize: 14,
+                    }}
+                  >
+                    <option value='newest'>Newest</option>
+                    <option value='title'>Title A-Z</option>
+                    <option value='favorites'>Favorites first</option>
+                  </select>
+                </label>
               </div>
             </div>
           </section>
@@ -195,7 +284,10 @@ export default function MarketplacePage() {
             />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-              {items.map(item => (
+              {sortedItems.map(item => {
+                const isFavorite = favoriteIds.includes(item.id)
+
+                return (
                 <div
                   key={item.id}
                   style={{
@@ -208,8 +300,28 @@ export default function MarketplacePage() {
                   }}
                 >
                   <div>
-                    <div style={{ color: 'var(--text)', fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
-                      {item.title}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+                      <div style={{ color: 'var(--text)', fontSize: 18, fontWeight: 700, minWidth: 0 }}>
+                        {item.title}
+                      </div>
+                      <button
+                        type='button'
+                        onClick={() => toggleFavorite(item.id)}
+                        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                        style={{
+                          width: 40,
+                          height: 40,
+                          minWidth: 40,
+                          borderRadius: 999,
+                          border: isFavorite ? '1px solid rgba(217,121,85,0.28)' : '1px solid var(--border)',
+                          background: isFavorite ? 'rgba(217,121,85,0.12)' : 'var(--bg-3)',
+                          color: isFavorite ? 'var(--accent)' : 'var(--text-3)',
+                          fontSize: 18,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isFavorite ? '♥' : '♡'}
+                      </button>
                     </div>
                     <div style={{ color: 'var(--text-3)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
                       {item.agent_type.replace(/_/g, ' ')} · by {item.owner_name}
@@ -263,7 +375,7 @@ export default function MarketplacePage() {
                     {importingItemId === item.id ? 'Importing...' : 'Import template'}
                   </button>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </div>
