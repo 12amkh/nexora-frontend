@@ -4,6 +4,7 @@ interface ConfirmDialogProps {
   open: boolean;
   title: string;
   description: string;
+  warning?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   loading?: boolean;
@@ -16,6 +17,7 @@ export default function ConfirmDialog({
   open,
   title,
   description,
+  warning,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   loading = false,
@@ -28,32 +30,16 @@ export default function ConfirmDialog({
   return (
     <div
       onClick={onCancel}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(3, 6, 18, 0.72)",
-        backdropFilter: "blur(8px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        zIndex: 1000,
-      }}
+      className="app-modal-overlay"
+      style={{ zIndex: 1300 }}
     >
       <div
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        style={{
-          width: "100%",
-          maxWidth: 460,
-          background: "linear-gradient(180deg, rgba(19,20,28,0.98) 0%, rgba(12,13,19,0.98) 100%)",
-          border: "1px solid var(--border)",
-          borderRadius: 20,
-          boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
-          padding: 24,
-        }}
+        className="app-modal-card"
+        style={{ maxWidth: 460, padding: 24 }}
       >
         <div
           style={{
@@ -97,6 +83,23 @@ export default function ConfirmDialog({
           {description}
         </p>
 
+        {warning && (
+          <div
+            style={{
+              marginTop: 18,
+              padding: "12px 14px",
+              borderRadius: 14,
+              border: destructive ? "1px solid rgba(248,113,113,0.24)" : "1px solid var(--border)",
+              background: destructive ? "rgba(248,113,113,0.08)" : "rgba(255,255,255,0.04)",
+              color: destructive ? "var(--red)" : "var(--text-2)",
+              fontSize: 13,
+              lineHeight: 1.6,
+            }}
+          >
+            {warning}
+          </div>
+        )}
+
         <div
           style={{
             display: "flex",
@@ -112,10 +115,10 @@ export default function ConfirmDialog({
               padding: "10px 16px",
               borderRadius: 10,
               border: "1px solid var(--border-2)",
-              background: "transparent",
-              color: "var(--text-2)",
+              background: "var(--bg)",
+              color: "var(--text)",
               fontSize: 14,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >

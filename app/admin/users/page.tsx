@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, getUser } from "@/lib/api";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import Sidebar from "@/components/Sidebar";
+import { useToast } from "@/components/ToastProvider";
 
 interface AdminUser {
   id: number;
@@ -20,11 +22,14 @@ interface AdminUser {
 
 export default function AdminUsers() {
   const router = useRouter();
+  const { pushToast, updateToast } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [changingPlan, setChangingPlan] = useState(false);
+  const [togglingUserState, setTogglingUserState] = useState(false);
+  const [pendingStatusUser, setPendingStatusUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
     async function init() {
@@ -76,26 +81,68 @@ export default function AdminUsers() {
 
   const handleChangePlan = async (userId: number, newPlan: string) => {
     setChangingPlan(true);
+    const userName = selectedUser?.name || "User";
+    const toastId = pushToast({
+      title: `Updating ${userName}`,
+      description: `Changing the account plan to ${newPlan}.`,
+      tone: "loading",
+      dismissible: false,
+    });
     try {
       await api.post(`/admin/users/${userId}/change-plan?plan=${newPlan}`);
       await loadUsers();
       setSelectedUser(null);
+      updateToast(toastId, {
+        title: "Plan updated",
+        description: `${userName} is now on the ${newPlan} plan.`,
+        tone: "success",
+        dismissible: true,
+      });
     } catch (error) {
       console.error("Failed to change plan:", error);
+      updateToast(toastId, {
+        title: "Couldn't update plan",
+        description: "Please try changing the plan again.",
+        tone: "error",
+        dismissible: true,
+      });
     } finally {
       setChangingPlan(false);
     }
   };
 
   const handleDeactivate = async (userId: number) => {
-    const isActive = selectedUser?.is_active ?? true;
-    if (!confirm(isActive ? "Deactivate this user?" : "Reactivate this user?")) return;
+    const targetUser = pendingStatusUser ?? selectedUser;
+    const isActive = targetUser?.is_active ?? true;
+    const userName = targetUser?.name || "User";
+    const toastId = pushToast({
+      title: `${isActive ? "Deactivating" : "Reactivating"} ${userName}`,
+      description: isActive ? "Removing access for this user account." : "Restoring access for this user account.",
+      tone: "loading",
+      dismissible: false,
+    });
+    setTogglingUserState(true);
     try {
       await api.post(`/admin/users/${userId}/${isActive ? "deactivate" : "reactivate"}`);
       await loadUsers();
       setSelectedUser(null);
+      setPendingStatusUser(null);
+      updateToast(toastId, {
+        title: isActive ? "User deactivated" : "User reactivated",
+        description: `${userName} was updated successfully.`,
+        tone: "success",
+        dismissible: true,
+      });
     } catch (error) {
       console.error("Failed to deactivate user:", error);
+      updateToast(toastId, {
+        title: isActive ? "Couldn't deactivate user" : "Couldn't reactivate user",
+        description: "Please try again.",
+        tone: "error",
+        dismissible: true,
+      });
+    } finally {
+      setTogglingUserState(false);
     }
   };
 
@@ -112,6 +159,30 @@ export default function AdminUsers() {
 
   return (
     <div className="flex min-h-screen bg-bg">
+      <ConfirmDialog
+        open={!!pendingStatusUser}
+        title={
+          pendingStatusUser
+            ? `${pendingStatusUser.is_active ? "Deactivate" : "Reactivate"} ${pendingStatusUser.name}?`
+            : "Update user status?"
+        }
+        description={
+          pendingStatusUser?.is_active
+            ? "This will prevent the user from accessing their account until they are reactivated."
+            : "This will restore the user's access to their account."
+        }
+        warning="This only changes account access. Existing agents and schedules remain in place."
+        confirmLabel={pendingStatusUser?.is_active ? "Deactivate user" : "Reactivate user"}
+        cancelLabel="Cancel"
+        destructive={pendingStatusUser?.is_active ?? false}
+        loading={togglingUserState}
+        onConfirm={() => {
+          if (pendingStatusUser) void handleDeactivate(pendingStatusUser.id);
+        }}
+        onCancel={() => {
+          if (!togglingUserState) setPendingStatusUser(null);
+        }}
+      />
       <Sidebar />
       <div className="flex-1 pl-[220px]">
         <div className="p-8">
@@ -234,7 +305,7 @@ export default function AdminUsers() {
 
                 {/* Actions */}
                 <button
-                  onClick={() => handleDeactivate(selectedUser.id)}
+                  onClick={() => setPendingStatusUser(selectedUser)}
                   className="w-full px-4 py-2 bg-red/20 text-red rounded-lg hover:bg-red/30 transition font-medium"
                 >
                   {selectedUser.is_active ? "Deactivate User" : "Reactivate User"}

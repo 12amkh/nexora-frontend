@@ -9,6 +9,7 @@ import AgentCard from "@/components/AgentCard";
 import { AppStateCard, StateActionButton } from "@/components/AppState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { DashboardLoadingState } from "@/components/LoadingSkeleton";
+import { useToast } from "@/components/ToastProvider";
 import UsageStats from "@/components/UsageStats";
 import RichContent from "@/components/RichContent";
 
@@ -82,6 +83,7 @@ function buildDefaultRunPrompt(agent: Agent) {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { pushToast, updateToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -174,6 +176,12 @@ export default function Dashboard() {
     if (runningAgentId) return;
 
     const prompt = buildDefaultRunPrompt(agent);
+    const toastId = pushToast({
+      title: `Running ${agent.name}`,
+      description: "Your agent is preparing a quick result from the dashboard.",
+      tone: "loading",
+      dismissible: false,
+    });
     setRunningAgentId(agent.id);
     setError("");
 
@@ -189,8 +197,21 @@ export default function Dashboard() {
         prompt,
         response: data.message,
       });
+      updateToast(toastId, {
+        title: `${agent.name} is ready`,
+        description: "The quick run finished successfully.",
+        tone: "success",
+        dismissible: true,
+      });
     } catch (err: unknown) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      updateToast(toastId, {
+        title: `Couldn't run ${agent.name}`,
+        description: message,
+        tone: "error",
+        dismissible: true,
+      });
     } finally {
       setRunningAgentId(null);
     }
@@ -199,6 +220,13 @@ export default function Dashboard() {
   const confirmDeleteAgent = async () => {
     if (!agentPendingDelete) return;
 
+    const agentName = agentPendingDelete.name;
+    const toastId = pushToast({
+      title: `Deleting ${agentName}`,
+      description: "We're removing this agent and its conversation history.",
+      tone: "loading",
+      dismissible: false,
+    });
     setDeletingAgentId(agentPendingDelete.id);
     setError("");
 
@@ -206,8 +234,21 @@ export default function Dashboard() {
       await api.delete(`/agents/${agentPendingDelete.id}`);
       setAgents((prev) => prev.filter((item) => item.id !== agentPendingDelete.id));
       setAgentPendingDelete(null);
+      updateToast(toastId, {
+        title: `${agentName} deleted`,
+        description: "The agent was removed successfully.",
+        tone: "success",
+        dismissible: true,
+      });
     } catch (err: unknown) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      updateToast(toastId, {
+        title: `Couldn't delete ${agentName}`,
+        description: message,
+        tone: "error",
+        dismissible: true,
+      });
     } finally {
       setDeletingAgentId(null);
     }
@@ -307,6 +348,7 @@ export default function Dashboard() {
         open={!!agentPendingDelete}
         title={agentPendingDelete ? `Delete ${agentPendingDelete.name}?` : "Delete agent?"}
         description="This will permanently remove the agent and all of its conversation history. This action cannot be undone."
+        warning="Deleting an agent also removes its stored chat history and any quick-run context tied to it."
         confirmLabel="Delete agent"
         cancelLabel="Keep agent"
         destructive
@@ -321,33 +363,15 @@ export default function Dashboard() {
       {runResult && (
         <div
           onClick={() => setRunResult(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(3, 6, 18, 0.72)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            zIndex: 1100,
-          }}
+          className="app-modal-overlay"
+          style={{ zIndex: 1100 }}
         >
           <div
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            style={{
-              width: "100%",
-              maxWidth: 860,
-              maxHeight: "88vh",
-              overflowY: "auto",
-              background: "linear-gradient(180deg, rgba(19,20,28,0.98) 0%, rgba(12,13,19,0.98) 100%)",
-              border: "1px solid var(--border)",
-              borderRadius: 24,
-              boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
-              padding: 28,
-            }}
+            className="app-modal-card"
+            style={{ width: "100%", maxWidth: 860, maxHeight: "88vh", overflowY: "auto", padding: 28 }}
           >
             <div
               style={{
@@ -482,31 +506,15 @@ export default function Dashboard() {
       {selectedAgent && (
         <div
           onClick={() => setSelectedAgent(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(3, 6, 18, 0.72)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            zIndex: 1000,
-          }}
+          className="app-modal-overlay"
+          style={{ zIndex: 1000 }}
         >
           <div
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            style={{
-              width: "100%",
-              maxWidth: 760,
-              background: "linear-gradient(180deg, rgba(19,20,28,0.98) 0%, rgba(12,13,19,0.98) 100%)",
-              border: "1px solid var(--border)",
-              borderRadius: 24,
-              boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
-              padding: 28,
-            }}
+            className="app-modal-card"
+            style={{ width: "100%", maxWidth: 760, padding: 28 }}
           >
             <div
               style={{

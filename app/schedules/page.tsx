@@ -7,8 +7,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { api, getUser, getErrorMessage, normalizePlan, refreshCurrentUser } from '@/lib/api'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import RichContent from '@/components/RichContent'
 import Sidebar from '@/components/Sidebar'
+import { useToast } from '@/components/ToastProvider'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,6 +148,7 @@ const formatRunTime = (isoDate?: string | null) => {
 
 export default function SchedulesPage() {
   const router = useRouter()
+  const { pushToast, updateToast } = useToast()
   const pollIntervals = useRef<Record<number, ReturnType<typeof setInterval>>>({})
   const restoredTasks = useRef(false)
 
@@ -155,6 +158,8 @@ export default function SchedulesPage() {
   const [showForm, setShowForm]     = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]           = useState('')
+  const [schedulePendingDelete, setSchedulePendingDelete] = useState<Schedule | null>(null)
+  const [deletingScheduleId, setDeletingScheduleId] = useState<number | null>(null)
   const [user, setUser]             = useState<{ email?: string; name?: string; plan?: string } | null>(null)
 
   const [taskResults, setTaskResults] = useState<Record<number, TaskResult>>({})
@@ -348,6 +353,12 @@ export default function SchedulesPage() {
     }
     setError('')
     setSubmitting(true)
+    const toastId = pushToast({
+      title: 'Creating schedule',
+      description: 'Saving your automation and preparing it to run.',
+      tone: 'loading',
+      dismissible: false,
+    })
     try {
       const cron = buildCron(form.repeat, form.hour, form.day)
       await api.post('/schedules/create', {
@@ -360,8 +371,18 @@ export default function SchedulesPage() {
       setForm(prev => ({ ...prev, name: '', prompt: '', repeat: 'daily', hour: '9', day: '1' }))
       setShowForm(false)
       await loadData()
+      updateToast(toastId, {
+        title: 'Schedule created',
+        description: 'Your new automation is ready.',
+        tone: 'success',
+      })
     } catch (err) {
       setError(getErrorMessage(err))
+      updateToast(toastId, {
+        title: 'Could not create schedule',
+        description: getErrorMessage(err),
+        tone: 'error',
+      })
     } finally {
       setSubmitting(false)
     }
@@ -370,34 +391,76 @@ export default function SchedulesPage() {
   // ── Pause / Resume ─────────────────────────────────────────────────────────
   const handleToggle = async (schedule: Schedule) => {
     setToggling(prev => new Set(prev).add(schedule.id))
+    const nextStateLabel = schedule.is_active ? 'Pausing schedule' : 'Resuming schedule'
+    const toastId = pushToast({
+      title: nextStateLabel,
+      description: `${schedule.name} is being updated.`,
+      tone: 'loading',
+      dismissible: false,
+    })
     try {
       await api.put(`/schedules/${schedule.id}`, { is_active: !schedule.is_active })
       setSchedules(prev =>
         prev.map(s => s.id === schedule.id ? { ...s, is_active: !s.is_active } : s)
       )
+      updateToast(toastId, {
+        title: schedule.is_active ? 'Schedule paused' : 'Schedule resumed',
+        description: `${schedule.name} was updated successfully.`,
+        tone: 'success',
+      })
     } catch (err) {
       setError(getErrorMessage(err))
+      updateToast(toastId, {
+        title: 'Schedule update failed',
+        description: getErrorMessage(err),
+        tone: 'error',
+      })
     } finally {
       setToggling(prev => { const n = new Set(prev); n.delete(schedule.id); return n })
     }
   }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this schedule?')) return
+  const handleDelete = async () => {
+    if (!schedulePendingDelete) return
+
+    setDeletingScheduleId(schedulePendingDelete.id)
+    const toastId = pushToast({
+      title: 'Deleting schedule',
+      description: `${schedulePendingDelete.name} is being removed.`,
+      tone: 'loading',
+      dismissible: false,
+    })
     try {
-      await api.delete(`/schedules/${id}`)
-      if (pollIntervals.current[id]) {
-        clearInterval(pollIntervals.current[id])
-        delete pollIntervals.current[id]
+      await api.delete(`/schedules/${schedulePendingDelete.id}`)
+      if (pollIntervals.current[schedulePendingDelete.id]) {
+        clearInterval(pollIntervals.current[schedulePendingDelete.id])
+        delete pollIntervals.current[schedulePendingDelete.id]
       }
-      forgetTask(id)
-      forgetResult(id)
-      setSchedules(prev => prev.filter(s => s.id !== id))
-      setRunning(prev => { const n = new Set(prev); n.delete(id); return n })
-      setTaskResults(prev => { const n = { ...prev }; delete n[id]; return n })
+      forgetTask(schedulePendingDelete.id)
+      forgetResult(schedulePendingDelete.id)
+      setSchedules(prev => prev.filter(s => s.id !== schedulePendingDelete.id))
+      setRunning(prev => { const n = new Set(prev); n.delete(schedulePendingDelete.id); return n })
+      setTaskResults(prev => {
+        const next = { ...prev }
+        delete next[schedulePendingDelete.id]
+        return next
+      })
+      updateToast(toastId, {
+        title: 'Schedule deleted',
+        description: `${schedulePendingDelete.name} was removed.`,
+        tone: 'success',
+      })
+      setSchedulePendingDelete(null)
     } catch (err) {
       setError(getErrorMessage(err))
+      updateToast(toastId, {
+        title: 'Could not delete schedule',
+        description: getErrorMessage(err),
+        tone: 'error',
+      })
+    } finally {
+      setDeletingScheduleId(null)
     }
   }
 
@@ -405,9 +468,21 @@ export default function SchedulesPage() {
   const handleRun = async (scheduleId: number) => {
     setRunning(prev => new Set(prev).add(scheduleId))
     setTaskResults(prev => ({ ...prev, [scheduleId]: { scheduleId, status: 'pending', result: 'Queued. Checking task status...' } }))
+    const scheduleName = schedules.find((schedule) => schedule.id === scheduleId)?.name ?? 'Schedule'
+    const toastId = pushToast({
+      title: 'Starting schedule run',
+      description: `${scheduleName} is being queued now.`,
+      tone: 'loading',
+      dismissible: false,
+    })
     try {
       const { data } = await api.post(`/schedules/${scheduleId}/run`)
       rememberTask(scheduleId, data.task_id)
+      updateToast(toastId, {
+        title: 'Schedule queued',
+        description: `${scheduleName} is now waiting to run.`,
+        tone: 'success',
+      })
       pollTask(scheduleId, data.task_id)
     } catch (err) {
       forgetTask(scheduleId)
@@ -416,6 +491,11 @@ export default function SchedulesPage() {
         ...prev,
         [scheduleId]: { scheduleId, status: 'failure', result: getErrorMessage(err) },
       }))
+      updateToast(toastId, {
+        title: 'Could not start schedule',
+        description: getErrorMessage(err),
+        tone: 'error',
+      })
     }
   }
 
@@ -528,6 +608,22 @@ export default function SchedulesPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+      <ConfirmDialog
+        open={!!schedulePendingDelete}
+        title={schedulePendingDelete ? `Delete ${schedulePendingDelete.name}?` : 'Delete schedule?'}
+        description='This permanently removes the schedule and clears any queued run state for it.'
+        warning='This action cannot be undone. Existing schedule history shown on this page will be removed from the current view.'
+        confirmLabel='Delete schedule'
+        cancelLabel='Keep schedule'
+        destructive
+        loading={schedulePendingDelete ? deletingScheduleId === schedulePendingDelete.id : false}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => {
+          if (!deletingScheduleId) {
+            setSchedulePendingDelete(null)
+          }
+        }}
+      />
       <Sidebar />
 
       {/* ── Main ── */}
@@ -809,7 +905,7 @@ export default function SchedulesPage() {
                       </button>
 
                       <button
-                        onClick={() => handleDelete(schedule.id)}
+                        onClick={() => setSchedulePendingDelete(schedule)}
                         style={{
                           padding: '6px 10px', borderRadius: 8,
                           background: 'transparent', border: '1px solid var(--border)',

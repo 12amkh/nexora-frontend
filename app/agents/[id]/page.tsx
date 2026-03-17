@@ -8,7 +8,9 @@ import { jsPDF } from 'jspdf'
 
 import { api, getErrorMessage, getToken } from '@/lib/api'
 import { AppStateCard, StateActionButton } from '@/components/AppState'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import { AgentPageLoadingState, ReportsLoadingState } from '@/components/LoadingSkeleton'
+import { useToast } from '@/components/ToastProvider'
 import RichContent, { parseRichContent } from '@/components/RichContent'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -101,6 +103,7 @@ function buildFollowUpPrompts(messages: Message[]): Array<{ label: string; promp
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const { pushToast, updateToast } = useToast()
   const [agent, setAgent] = useState<Agent | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [reports, setReports] = useState<Report[]>([])
@@ -112,6 +115,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [reportsLoading, setReportsLoading] = useState(false)
   const [reportsLoaded, setReportsLoaded] = useState(false)
   const [previewReport, setPreviewReport] = useState<Report | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [error, setError] = useState('')
   const [agentLoadError, setAgentLoadError] = useState('')
   const [historyError, setHistoryError] = useState('')
@@ -436,21 +440,35 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const handleDelete = async () => {
     if (!agent || deleting) return
 
-    const confirmed = window.confirm(
-      `Delete "${agent.name}"?\n\nThis will also remove its conversation history and cannot be undone.`
-    )
-
-    if (!confirmed) return
-
+    const toastId = pushToast({
+      title: `Deleting ${agent.name}`,
+      description: 'Removing this agent and its conversation history.',
+      tone: 'loading',
+      dismissible: false,
+    })
     setDeleting(true)
     setError('')
 
     try {
       await api.delete(`/agents/${id}`)
+      updateToast(toastId, {
+        title: `${agent.name} deleted`,
+        description: 'The agent was removed successfully.',
+        tone: 'success',
+        dismissible: true,
+      })
       router.push('/dashboard')
     } catch (err: unknown) {
-      setError(getErrorMessage(err))
+      const message = getErrorMessage(err)
+      setError(message)
+      updateToast(toastId, {
+        title: `Couldn't delete ${agent.name}`,
+        description: message,
+        tone: 'error',
+        dismissible: true,
+      })
       setDeleting(false)
+      setShowDeleteDialog(false)
     }
   }
 
@@ -498,6 +516,20 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+      <ConfirmDialog
+        open={showDeleteDialog}
+        title={agent ? `Delete ${agent.name}?` : 'Delete agent?'}
+        description='This permanently removes the agent and all of its conversation history.'
+        warning='Saved reports and recent chat context tied to this agent will no longer be available after deletion.'
+        confirmLabel='Delete agent'
+        cancelLabel='Keep agent'
+        destructive
+        loading={deleting}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => {
+          if (!deleting) setShowDeleteDialog(false)
+        }}
+      />
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)' }}>
         <Link href="/dashboard" style={{ color: 'var(--text-3)', fontSize: '1.1rem' }}>
           ←
@@ -511,7 +543,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         {agent && (
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteDialog(true)}
               disabled={deleting}
               style={{
                 color: deleting ? 'var(--text-3)' : 'var(--red)',
@@ -563,28 +595,13 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       {previewReport && (
         <div
           onClick={() => setPreviewReport(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.65)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '2rem',
-            zIndex: 50,
-          }}
+          className='app-modal-overlay'
+          style={{ zIndex: 50 }}
         >
           <div
             onClick={(event) => event.stopPropagation()}
-            style={{
-              width: 'min(920px, 100%)',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              background: 'var(--bg-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 20,
-              padding: '1.5rem',
-            }}
+            className='app-modal-card'
+            style={{ width: 'min(920px, 100%)', maxHeight: '85vh', overflowY: 'auto', padding: '1.5rem' }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
               <div>

@@ -4,8 +4,10 @@ import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AppStateCard, StateActionButton } from '@/components/AppState'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import { SettingsLoadingState } from '@/components/LoadingSkeleton'
 import Sidebar from '@/components/Sidebar'
+import { useToast } from '@/components/ToastProvider'
 import UsageStats from '@/components/UsageStats'
 import { useTheme } from '@/components/ThemeProvider'
 import {
@@ -62,6 +64,7 @@ const THEME_MODE_OPTIONS: Array<{
 export default function SettingsPage() {
   const router = useRouter()
   const { themeMode, themeFamily, setTheme, setThemeFamily } = useTheme()
+  const { pushToast, updateToast } = useToast()
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -69,6 +72,8 @@ export default function SettingsPage() {
   const [nameInput, setNameInput] = useState('')
   const [updatingProfile, setUpdatingProfile] = useState(false)
   const [savingTheme, setSavingTheme] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false)
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
@@ -131,6 +136,12 @@ export default function SettingsPage() {
 
     setUpdatingProfile(true)
     setStatusMessage(null)
+    const toastId = pushToast({
+      title: 'Saving profile',
+      description: 'Updating your account details.',
+      tone: 'loading',
+      dismissible: false,
+    })
 
     try {
       const response = await fetchUpdateProfile(trimmedName)
@@ -138,8 +149,21 @@ export default function SettingsPage() {
       setUser(response)
       setNameInput(response.name)
       setFeedback('success', 'Profile updated successfully.')
+      updateToast(toastId, {
+        title: 'Profile saved',
+        description: 'Your display name was updated.',
+        tone: 'success',
+        dismissible: true,
+      })
     } catch (error) {
-      setFeedback('error', getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setFeedback('error', message)
+      updateToast(toastId, {
+        title: "Couldn't save profile",
+        description: message,
+        tone: 'error',
+        dismissible: true,
+      })
     } finally {
       setUpdatingProfile(false)
     }
@@ -150,6 +174,12 @@ export default function SettingsPage() {
 
     setSavingTheme(true)
     setStatusMessage(null)
+    const toastId = pushToast({
+      title: 'Updating theme mode',
+      description: 'Saving your light or dark preference.',
+      tone: 'loading',
+      dismissible: false,
+    })
 
     try {
       await setTheme(nextThemeMode)
@@ -161,8 +191,21 @@ export default function SettingsPage() {
         setUser(updatedUser)
       }
       setFeedback('success', 'Theme mode updated successfully.')
+      updateToast(toastId, {
+        title: 'Theme mode saved',
+        description: 'Your appearance preference is now synced.',
+        tone: 'success',
+        dismissible: true,
+      })
     } catch (error) {
-      setFeedback('error', getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setFeedback('error', message)
+      updateToast(toastId, {
+        title: "Couldn't update theme mode",
+        description: message,
+        tone: 'error',
+        dismissible: true,
+      })
     } finally {
       setSavingTheme(false)
     }
@@ -173,6 +216,12 @@ export default function SettingsPage() {
 
     setSavingTheme(true)
     setStatusMessage(null)
+    const toastId = pushToast({
+      title: 'Updating theme family',
+      description: 'Applying your selected Nexora theme family.',
+      tone: 'loading',
+      dismissible: false,
+    })
 
     try {
       await setThemeFamily(nextThemeFamily)
@@ -184,28 +233,58 @@ export default function SettingsPage() {
         setUser(updatedUser)
       }
       setFeedback('success', 'Theme family updated successfully.')
+      updateToast(toastId, {
+        title: 'Theme family saved',
+        description: 'Your theme palette was updated successfully.',
+        tone: 'success',
+        dismissible: true,
+      })
     } catch (error) {
-      setFeedback('error', getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setFeedback('error', message)
+      updateToast(toastId, {
+        title: "Couldn't update theme family",
+        description: message,
+        tone: 'error',
+        dismissible: true,
+      })
     } finally {
       setSavingTheme(false)
     }
   }
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      'Are you absolutely sure? This will permanently delete your account, agents, schedules, and chat history.'
-    )
-    if (!confirmed) return
-
-    const finalConfirmed = window.confirm('This action cannot be undone. Delete your account now?')
-    if (!finalConfirmed) return
+    if (deletingAccount) return
+    const toastId = pushToast({
+      title: 'Deleting account',
+      description: 'Removing your profile, agents, schedules, and chat history.',
+      tone: 'loading',
+      dismissible: false,
+    })
+    setDeletingAccount(true)
 
     try {
       await fetchDeleteAccount()
+      updateToast(toastId, {
+        title: 'Account deleted',
+        description: 'Your account was removed successfully.',
+        tone: 'success',
+        dismissible: true,
+      })
       logout()
     } catch (error) {
-      setFeedback('error', getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setFeedback('error', message)
+      updateToast(toastId, {
+        title: "Couldn't delete account",
+        description: message,
+        tone: 'error',
+        dismissible: true,
+      })
       window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      setDeletingAccount(false)
+      setShowDeleteAccountDialog(false)
     }
   }
 
@@ -220,6 +299,20 @@ export default function SettingsPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+      <ConfirmDialog
+        open={showDeleteAccountDialog}
+        title='Delete your account?'
+        description='This permanently removes your profile, agents, schedules, and chat history from Nexora.'
+        warning='This action cannot be undone. You will be signed out immediately after the deletion completes.'
+        confirmLabel='Delete account'
+        cancelLabel='Keep account'
+        destructive
+        loading={deletingAccount}
+        onConfirm={() => void handleDeleteAccount()}
+        onCancel={() => {
+          if (!deletingAccount) setShowDeleteAccountDialog(false)
+        }}
+      />
       <Sidebar />
 
       <main className='app-shell-main' style={pageStyle}>
@@ -494,7 +587,7 @@ export default function SettingsPage() {
                   title='Delete account'
                   description='Permanently remove your profile, agents, schedules, and conversation history.'
                   actionLabel='Delete account'
-                  onClick={handleDeleteAccount}
+                  onClick={() => setShowDeleteAccountDialog(true)}
                   tone='danger'
                 />
               </div>

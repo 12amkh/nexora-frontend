@@ -7,6 +7,8 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/ToastProvider";
 import { api, getErrorMessage } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,12 +58,14 @@ export default function EditAgentPage({
   // Next.js 16: params is a Promise — must unwrap with use()
   const { id } = use(params);
   const router = useRouter();
+  const { pushToast, updateToast } = useToast();
 
   const [form, setForm] = useState<AgentFormState>(DEFAULT_FORM);
   const [agentType, setAgentType] = useState(""); // read-only display badge
   const [loading, setLoading] = useState(true);   // true while fetching agent
   const [saving, setSaving] = useState(false);    // true while PUT is in flight
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [error, setError] = useState("");
 
   // ── Load agent on mount ──────────────────────────────────────────────────
@@ -128,6 +132,12 @@ export default function EditAgentPage({
   const handleSave = async () => {
     setError("");
     setSaving(true);
+    const toastId = pushToast({
+      title: "Saving agent",
+      description: "Applying your agent changes.",
+      tone: "loading",
+      dismissible: false,
+    });
     try {
       // Split comma-separated strings back into arrays for the backend
       const focusArr = form.focus_topics
@@ -157,9 +167,22 @@ export default function EditAgentPage({
       });
 
       // Success → navigate back to the agent chat page
+      updateToast(toastId, {
+        title: "Agent updated",
+        description: "Your changes were saved successfully.",
+        tone: "success",
+        dismissible: true,
+      });
       router.push(`/agents/${id}`);
     } catch (err: unknown) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      updateToast(toastId, {
+        title: "Couldn't save agent",
+        description: message,
+        tone: "error",
+        dismissible: true,
+      });
     } finally {
       setSaving(false);
     }
@@ -168,21 +191,36 @@ export default function EditAgentPage({
   const handleDelete = async () => {
     if (deleting) return;
 
-    const confirmed = window.confirm(
-      `Delete "${form.name || "this agent"}"?\n\nThis will also remove its conversation history and cannot be undone.`
-    );
-
-    if (!confirmed) return;
-
+    const agentName = form.name || "this agent";
+    const toastId = pushToast({
+      title: `Deleting ${agentName}`,
+      description: "Removing the agent and its conversation history.",
+      tone: "loading",
+      dismissible: false,
+    });
     setDeleting(true);
     setError("");
 
     try {
       await api.delete(`/agents/${id}`);
+      updateToast(toastId, {
+        title: `${agentName} deleted`,
+        description: "The agent was removed successfully.",
+        tone: "success",
+        dismissible: true,
+      });
       router.push("/dashboard");
     } catch (err: unknown) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      updateToast(toastId, {
+        title: `Couldn't delete ${agentName}`,
+        description: message,
+        tone: "error",
+        dismissible: true,
+      });
       setDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -190,6 +228,20 @@ export default function EditAgentPage({
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
+      <ConfirmDialog
+        open={showDeleteDialog}
+        title={`Delete ${form.name || "this agent"}?`}
+        description="This permanently removes the agent and all of its conversation history."
+        warning="Any saved setup for this agent will be lost immediately and cannot be recovered."
+        confirmLabel="Delete agent"
+        cancelLabel="Keep agent"
+        destructive
+        loading={deleting}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => {
+          if (!deleting) setShowDeleteDialog(false);
+        }}
+      />
 
       {/* ── Fixed sidebar (matches dashboard + chat pages) ── */}
       <aside
@@ -543,7 +595,7 @@ export default function EditAgentPage({
               }}
             >
               <button
-                onClick={handleDelete}
+                onClick={() => setShowDeleteDialog(true)}
                 disabled={deleting || saving}
                 style={{
                   padding: "10px 20px",
