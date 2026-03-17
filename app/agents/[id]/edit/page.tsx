@@ -33,6 +33,13 @@ interface AgentFormState {
   max_history: number;
 }
 
+interface MarketplaceItem {
+  id: number;
+  title: string;
+  description: string;
+  owner_name: string;
+}
+
 // Default values used while the agent is loading (prevents uncontrolled→controlled flicker)
 const DEFAULT_FORM: AgentFormState = {
   name: "",
@@ -68,6 +75,9 @@ export default function EditAgentPage({
   const [saving, setSaving] = useState(false);    // true while PUT is in flight
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [marketplaceItem, setMarketplaceItem] = useState<MarketplaceItem | null>(null);
+  const [marketplaceLoading, setMarketplaceLoading] = useState(true);
+  const [publishingMarketplace, setPublishingMarketplace] = useState(false);
   const [error, setError] = useState("");
 
   // ── Load agent on mount ──────────────────────────────────────────────────
@@ -110,6 +120,22 @@ export default function EditAgentPage({
 
     fetchAgent();
   }, [id]); // re-run if id ever changes (e.g. back/forward navigation)
+
+  useEffect(() => {
+    const fetchMarketplaceState = async () => {
+      setMarketplaceLoading(true);
+      try {
+        const res = await api.get(`/marketplace/agents/${id}`);
+        setMarketplaceItem(res.data);
+      } catch {
+        setMarketplaceItem(null);
+      } finally {
+        setMarketplaceLoading(false);
+      }
+    };
+
+    fetchMarketplaceState();
+  }, [id]);
 
   // ── Generic change handler for all text/select/number inputs ─────────────
   // Using a single handler avoids one onChange per field boilerplate
@@ -225,6 +251,72 @@ export default function EditAgentPage({
       });
       setDeleting(false);
       setShowDeleteDialog(false);
+    }
+  };
+
+  const handlePublishMarketplace = async () => {
+    if (publishingMarketplace) return;
+
+    setPublishingMarketplace(true);
+    const toastId = pushToast({
+      title: marketplaceItem ? "Updating marketplace listing" : "Publishing to marketplace",
+      description: marketplaceItem
+        ? "Refreshing the public template with your latest agent setup."
+        : "Creating a public marketplace template from this agent.",
+      tone: "loading",
+      dismissible: false,
+    });
+
+    try {
+      const { data } = await api.post(`/marketplace/agents/${id}/publish`);
+      setMarketplaceItem(data);
+      updateToast(toastId, {
+        title: marketplaceItem ? "Marketplace listing updated" : "Agent published",
+        description: "This agent is now available in the Nexora marketplace.",
+        tone: "success",
+        dismissible: true,
+      });
+    } catch (err: unknown) {
+      updateToast(toastId, {
+        title: "Couldn't publish agent",
+        description: getErrorMessage(err),
+        tone: "error",
+        dismissible: true,
+      });
+    } finally {
+      setPublishingMarketplace(false);
+    }
+  };
+
+  const handleUnpublishMarketplace = async () => {
+    if (!marketplaceItem || publishingMarketplace) return;
+
+    setPublishingMarketplace(true);
+    const toastId = pushToast({
+      title: "Removing marketplace listing",
+      description: "Taking this agent out of the public marketplace.",
+      tone: "loading",
+      dismissible: false,
+    });
+
+    try {
+      await api.delete(`/marketplace/items/${marketplaceItem.id}`);
+      setMarketplaceItem(null);
+      updateToast(toastId, {
+        title: "Listing removed",
+        description: "This agent is private again and no longer visible in the marketplace.",
+        tone: "success",
+        dismissible: true,
+      });
+    } catch (err: unknown) {
+      updateToast(toastId, {
+        title: "Couldn't remove listing",
+        description: getErrorMessage(err),
+        tone: "error",
+        dismissible: true,
+      });
+    } finally {
+      setPublishingMarketplace(false);
     }
   };
 
@@ -420,6 +512,91 @@ export default function EditAgentPage({
                   rows={3}
                 />
               </Field>
+            </Section>
+
+            <Section title="Marketplace">
+              <div
+                style={{
+                  padding: "16px 18px",
+                  borderRadius: 14,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-3)",
+                  display: "grid",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <div style={{ color: "var(--text)", fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+                    {marketplaceItem ? "Published in marketplace" : "Private by default"}
+                  </div>
+                  <div style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.7 }}>
+                    {marketplaceLoading
+                      ? "Checking whether this agent already has a marketplace listing..."
+                      : marketplaceItem
+                        ? `This agent is public as "${marketplaceItem.title}" and can be imported by other Nexora users.`
+                        : "Publish this agent to let other users browse its template and import a copy into their own account."}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => void handlePublishMarketplace()}
+                    disabled={marketplaceLoading || publishingMarketplace}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: "none",
+                      background: "var(--accent)",
+                      color: "#fff",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor: marketplaceLoading || publishingMarketplace ? "not-allowed" : "pointer",
+                      opacity: marketplaceLoading || publishingMarketplace ? 0.8 : 1,
+                    }}
+                  >
+                    {publishingMarketplace
+                      ? "Saving..."
+                      : marketplaceItem
+                        ? "Update marketplace listing"
+                        : "Publish to marketplace"}
+                  </button>
+                  {marketplaceItem && (
+                    <button
+                      onClick={() => void handleUnpublishMarketplace()}
+                      disabled={publishingMarketplace}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 10,
+                        border: "1px solid var(--border)",
+                        background: "transparent",
+                        color: "var(--text)",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        cursor: publishingMarketplace ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Remove listing
+                    </button>
+                  )}
+                  <Link
+                    href="/marketplace"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: "1px solid var(--border)",
+                      background: "transparent",
+                      color: "var(--text-2)",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      textDecoration: "none",
+                    }}
+                  >
+                    Open marketplace
+                  </Link>
+                </div>
+              </div>
             </Section>
 
             {/* ── Section: Behavior ── */}
