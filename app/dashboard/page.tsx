@@ -152,15 +152,20 @@ function SectionToggleHeader({
       <span
         aria-hidden="true"
         style={{
-          width: 28,
-          minWidth: 28,
+          width: 34,
+          minWidth: 34,
+          height: 34,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "var(--text-3)",
-          fontSize: 18,
+          color: "var(--accent)",
+          background: "var(--accent-g)",
+          border: "1px solid color-mix(in srgb, var(--accent) 32%, transparent)",
+          borderRadius: 999,
+          fontSize: 20,
+          fontWeight: 700,
           lineHeight: 1,
-          marginTop: 4,
+          marginTop: 2,
           transform: open ? "rotate(180deg)" : "rotate(0deg)",
           transition: "transform 0.2s ease",
         }}
@@ -1449,7 +1454,7 @@ export default function Dashboard() {
                 </div>
               )}
 
-            {agents.length === 0 ? (
+            {!agentsOpen ? null : agents.length === 0 ? (
               <div
                 style={{
                   background: "var(--bg-2)",
