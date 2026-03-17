@@ -50,6 +50,7 @@ interface ActivityItem {
 }
 
 interface AgentRunResult {
+  agent: Agent;
   agentId: number;
   prompt: string;
   response: string;
@@ -154,7 +155,6 @@ export default function Dashboard() {
 
     const prompt = buildDefaultRunPrompt(agent);
     setRunningAgentId(agent.id);
-    setSelectedAgent(agent);
     setError("");
 
     try {
@@ -164,6 +164,7 @@ export default function Dashboard() {
       });
 
       setRunResult({
+        agent,
         agentId: agent.id,
         prompt,
         response: data.message,
@@ -302,6 +303,167 @@ export default function Dashboard() {
           }
         }}
       />
+      {runResult && (
+        <div
+          onClick={() => setRunResult(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(3, 6, 18, 0.72)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            zIndex: 1100,
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            style={{
+              width: "100%",
+              maxWidth: 860,
+              maxHeight: "88vh",
+              overflowY: "auto",
+              background: "linear-gradient(180deg, rgba(19,20,28,0.98) 0%, rgba(12,13,19,0.98) 100%)",
+              border: "1px solid var(--border)",
+              borderRadius: 24,
+              boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
+              padding: 28,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 20,
+                marginBottom: 22,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    background: "rgba(217,121,85,0.1)",
+                    color: "var(--accent)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    marginBottom: 12,
+                  }}
+                >
+                  Agent Run Result
+                </div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 30,
+                    fontWeight: 700,
+                    color: "var(--text)",
+                    letterSpacing: "-0.03em",
+                  }}
+                >
+                  {runResult.agent.name}
+                </h3>
+                <div style={{ color: "var(--text-3)", fontSize: 14, marginTop: 8, maxWidth: 640, lineHeight: 1.7 }}>
+                  Result from the dashboard quick run using the default prompt for this agent.
+                </div>
+              </div>
+              <button
+                onClick={() => setRunResult(null)}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 999,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-3)",
+                  color: "var(--text)",
+                  fontSize: 18,
+                  cursor: "pointer",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              style={{
+                background: "var(--bg-3)",
+                border: "1px solid var(--border)",
+                borderRadius: 18,
+                padding: 18,
+                marginBottom: 18,
+              }}
+            >
+              <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                Prompt Used
+              </div>
+              <div style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.7 }}>
+                {runResult.prompt}
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "var(--bg-3)",
+                border: "1px solid var(--border)",
+                borderRadius: 18,
+                padding: 18,
+                marginBottom: 22,
+              }}
+            >
+              <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+                Response
+              </div>
+              <div style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.8 }}>
+                <RichContent content={runResult.response} />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setRunResult(null)}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  border: "1px solid var(--border-2)",
+                  background: "transparent",
+                  color: "var(--text-2)",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+              <Link
+                href={`/agents/${runResult.agentId}`}
+                onClick={() => setRunResult(null)}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "var(--accent)",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                Open Full Chat
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
       {selectedAgent && (
         <div
           onClick={() => setSelectedAgent(null)}
@@ -466,78 +628,24 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div
-              style={{
-                background: "var(--bg-3)",
-                border: "1px solid var(--border)",
-                borderRadius: 18,
-                padding: 18,
-                marginBottom: 22,
-              }}
-            >
-              <div
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" }}>
+              <button
+                onClick={() => handleRunAgent(selectedAgent)}
+                disabled={runningAgentId === selectedAgent.id}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                  marginBottom: 12,
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-3)",
+                  color: "var(--text)",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: runningAgentId === selectedAgent.id ? "not-allowed" : "pointer",
+                  opacity: runningAgentId === selectedAgent.id ? 0.8 : 1,
                 }}
               >
-                <div>
-                  <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-                    Quick Run
-                  </div>
-                  <div style={{ color: "var(--text-2)", fontSize: 14 }}>
-                    Run this agent right now with a default prompt, without leaving the dashboard.
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleRunAgent(selectedAgent)}
-                  disabled={runningAgentId === selectedAgent.id}
-                  style={{
-                    padding: "10px 16px",
-                    borderRadius: 12,
-                    border: "none",
-                    background: "var(--accent)",
-                    color: "#fff",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: runningAgentId === selectedAgent.id ? "not-allowed" : "pointer",
-                    opacity: runningAgentId === selectedAgent.id ? 0.8 : 1,
-                    minWidth: 110,
-                  }}
-                >
-                  {runningAgentId === selectedAgent.id ? "Running..." : "Run agent"}
-                </button>
-              </div>
-
-              {runResult?.agentId === selectedAgent.id && (
-                <div
-                  style={{
-                    background: "var(--bg)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 16,
-                    padding: 16,
-                  }}
-                >
-                  <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-                    Default Prompt
-                  </div>
-                  <div style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
-                    {runResult.prompt}
-                  </div>
-                  <div style={{ color: "var(--text-3)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-                    Response
-                  </div>
-                  <div style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.8 }}>
-                    <RichContent content={runResult.response} />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" }}>
+                {runningAgentId === selectedAgent.id ? "Running..." : "Run agent"}
+              </button>
               <button
                 onClick={() => setSelectedAgent(null)}
                 style={{
