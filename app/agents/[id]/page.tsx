@@ -7,6 +7,7 @@ import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx'
 import { jsPDF } from 'jspdf'
 
 import { api, getErrorMessage, getToken } from '@/lib/api'
+import { AgentPageLoadingState, ReportsLoadingState } from '@/components/LoadingSkeleton'
 import RichContent, { parseRichContent } from '@/components/RichContent'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -103,6 +104,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [messages, setMessages] = useState<Message[]>([])
   const [reports, setReports] = useState<Report[]>([])
   const [input, setInput] = useState('')
+  const [pageLoading, setPageLoading] = useState(true)
   const [streaming, setStreaming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [activeTab, setActiveTab] = useState<'chat' | 'reports'>('chat')
@@ -116,12 +118,20 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const followUpActions = buildFollowUpPrompts(messages)
 
   useEffect(() => {
-    if (!localStorage.getItem('token')) {
-      router.push('/login')
-      return
+    const init = async () => {
+      if (!localStorage.getItem('token')) {
+        router.push('/login')
+        return
+      }
+
+      try {
+        await Promise.all([loadAgent(), loadHistory()])
+      } finally {
+        setPageLoading(false)
+      }
     }
-    loadAgent()
-    loadHistory()
+
+    void init()
   }, [id])
 
   useEffect(() => {
@@ -434,6 +444,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       setError(getErrorMessage(err))
       setDeleting(false)
     }
+  }
+
+  if (pageLoading) {
+    return <AgentPageLoadingState />
   }
 
   return (
@@ -803,7 +817,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem 2rem', maxWidth: '900px', width: '100%', margin: '0 auto', alignSelf: 'center' }}>
           {reportsLoading ? (
-            <div style={{ color: 'var(--text-3)', fontSize: '0.95rem', padding: '1rem 0' }}>Loading reports...</div>
+            <ReportsLoadingState />
           ) : reports.length === 0 ? (
             <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.4rem 1.2rem', color: 'var(--text-2)', lineHeight: 1.7 }}>
               <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: '1rem', marginBottom: '0.4rem' }}>

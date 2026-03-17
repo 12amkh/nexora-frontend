@@ -7,6 +7,7 @@ import { api, formatPlanName, getErrorMessage, getUser, logout, refreshCurrentUs
 import Sidebar from "@/components/Sidebar";
 import AgentCard from "@/components/AgentCard";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { DashboardLoadingState } from "@/components/LoadingSkeleton";
 import UsageStats from "@/components/UsageStats";
 import RichContent from "@/components/RichContent";
 
@@ -278,12 +279,7 @@ export default function Dashboard() {
   };
 
   if (loading || !user) {
-    return (
-      <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
-        <Sidebar />
-        <main className="app-shell-main" style={{ color: "var(--text)" }}>Loading...</main>
-      </div>
-    );
+    return <DashboardLoadingState />;
   }
 
   return (

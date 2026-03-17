@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { UpgradeLoadingState } from '@/components/LoadingSkeleton'
 import Sidebar from '@/components/Sidebar'
 import { formatPlanName, getUser, normalizePlan, refreshCurrentUser } from '@/lib/api'
 
@@ -101,6 +102,10 @@ export default function UpgradePage() {
 
   const normalizedPlan = normalizePlan(user?.plan) as PlanName
   const isLoggedIn = Boolean(user)
+
+  if (!hydrated) {
+    return <UpgradeLoadingState showSidebar={isLoggedIn} />
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>

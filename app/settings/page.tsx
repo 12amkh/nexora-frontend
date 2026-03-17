@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { SettingsLoadingState } from '@/components/LoadingSkeleton'
 import Sidebar from '@/components/Sidebar'
 import UsageStats from '@/components/UsageStats'
 import { useTheme } from '@/components/ThemeProvider'
@@ -209,6 +210,10 @@ export default function SettingsPage() {
   const currentTheme = getThemeDefinition(themeFamily)
   const joinedLabel = formatJoinedDate(user?.created_at)
   const hasProfileChanges = nameInput.trim() !== '' && nameInput.trim() !== user?.name
+
+  if (loading && !user) {
+    return <SettingsLoadingState />
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>

@@ -333,3 +333,21 @@ button, input, textarea { font-family: inherit; }
 ::selection { background: color-mix(in srgb, var(--accent) 25%, transparent); }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 10px; }
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-block {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--bg-3) 92%, transparent) 0%,
+    color-mix(in srgb, var(--border-2) 85%, transparent) 45%,
+    color-mix(in srgb, var(--bg-3) 92%, transparent) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
