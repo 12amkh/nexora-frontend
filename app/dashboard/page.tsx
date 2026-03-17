@@ -128,6 +128,7 @@ export default function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [recentInsights, setRecentInsights] = useState<RecentInsight[]>([]);
+  const [recentInsightsOpen, setRecentInsightsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
@@ -1008,21 +1009,47 @@ export default function Dashboard() {
                 flexWrap: "wrap",
               }}
             >
-              <div>
-                <h2
+              <button
+                type="button"
+                onClick={() => setRecentInsightsOpen((current) => !current)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  border: "none",
+                  background: "transparent",
+                  padding: 0,
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <span
+                  aria-hidden="true"
                   style={{
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: "var(--text)",
-                    margin: "0 0 4px",
+                    color: "var(--text-3)",
+                    fontSize: 18,
+                    transform: recentInsightsOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
                   }}
                 >
-                  Recent Insights
-                </h2>
-                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-                  The latest saved reports and useful outputs generated across your agents.
-                </p>
-              </div>
+                  ▾
+                </span>
+                <div>
+                  <h2
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 700,
+                      color: "var(--text)",
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    Recent Insights
+                  </h2>
+                  <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                    The latest saved reports and useful outputs generated across your agents.
+                  </p>
+                </div>
+              </button>
               <Link
                 href="/agents"
                 style={{
@@ -1036,7 +1063,7 @@ export default function Dashboard() {
               </Link>
             </div>
 
-            {recentInsights.length === 0 ? (
+            {!recentInsightsOpen ? null : recentInsights.length === 0 ? (
               <AppStateCard
                 tone="neutral"
                 title="No recent insights yet"
