@@ -1,13 +1,22 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useTheme } from "@/components/ThemeProvider";
 import { getThemeDefinition } from "@/lib/themes";
 
+const subscribe = () => () => {};
+const getServerSnapshot = () => false;
+const getClientSnapshot = () => true;
+
 export default function ThemeToggle() {
   const { themeMode, themeFamily, toggleTheme } = useTheme();
-  const label = themeMode === "dark" ? "Switch to light theme" : "Switch to dark theme";
-  const actionLabel = themeMode === "dark" ? "Light" : "Dark";
-  const themeName = getThemeDefinition(themeFamily).name;
+  const mounted = useSyncExternalStore(subscribe, getClientSnapshot, getServerSnapshot);
+
+  const resolvedThemeMode = mounted ? themeMode : "dark";
+  const resolvedThemeFamily = mounted ? themeFamily : "nexora";
+  const label = resolvedThemeMode === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  const actionLabel = resolvedThemeMode === "dark" ? "Light" : "Dark";
+  const themeName = getThemeDefinition(resolvedThemeFamily).name;
 
   return (
     <button
@@ -43,11 +52,11 @@ export default function ThemeToggle() {
           display: "grid",
           placeItems: "center",
           background:
-            themeMode === "dark" ? "rgba(245,239,227,0.12)" : "rgba(23,23,23,0.08)",
+            resolvedThemeMode === "dark" ? "rgba(245,239,227,0.12)" : "rgba(23,23,23,0.08)",
           fontSize: 13,
         }}
       >
-        {themeMode === "dark" ? "☀" : "☾"}
+        {resolvedThemeMode === "dark" ? "☀" : "☾"}
       </span>
       <span>{themeName} · {actionLabel}</span>
     </button>
