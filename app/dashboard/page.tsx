@@ -65,6 +65,15 @@ interface PerformanceInsightCard {
   detail: string;
 }
 
+interface RecentInsight {
+  id: number;
+  agent_id: number;
+  agent_name: string;
+  title: string;
+  content: string;
+  created_at: string;
+}
+
 function buildDefaultRunPrompt(agent: Agent) {
   const type = agent.config?.agent_type || "custom";
 
@@ -87,12 +96,38 @@ function buildDefaultRunPrompt(agent: Agent) {
   return "Give me a clear, structured response showing what you are best at and the most useful next steps.";
 }
 
+function extractInsightHeadline(report: RecentInsight) {
+  const normalizedTitle = report.title.trim();
+  if (normalizedTitle && normalizedTitle.toLowerCase() !== "agent report") {
+    return normalizedTitle;
+  }
+
+  const firstLine = report.content
+    .split("\n")
+    .map((line) => line.replace(/^#+\s*/, "").trim())
+    .find(Boolean);
+
+  return firstLine || "Untitled insight";
+}
+
+function extractInsightPreview(report: RecentInsight) {
+  const headline = extractInsightHeadline(report);
+  const lines = report.content
+    .split("\n")
+    .map((line) => line.replace(/^#+\s*/, "").trim())
+    .filter(Boolean);
+
+  const preview = lines.find((line) => line !== headline) || lines[0] || "Saved report ready to review.";
+  return preview.length > 160 ? `${preview.slice(0, 157)}...` : preview;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const { pushToast, updateToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [recentInsights, setRecentInsights] = useState<RecentInsight[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
@@ -105,11 +140,21 @@ export default function Dashboard() {
   const [error, setError] = useState("");
 
   const loadDashboardData = async () => {
-    const res = await api.get("/agents/list?limit=50");
-    setAgents(Array.isArray(res.data) ? res.data : []);
+    const [agentsRes, schedulesRes] = await Promise.all([
+      api.get("/agents/list?limit=50"),
+      api.get("/schedules/list?limit=20"),
+    ]);
 
-    const schedulesRes = await api.get("/schedules/list?limit=20");
+    setAgents(Array.isArray(agentsRes.data) ? agentsRes.data : []);
     setSchedules(Array.isArray(schedulesRes.data) ? schedulesRes.data : []);
+
+    try {
+      const recentInsightsRes = await api.get("/agents/reports/recent?limit=6");
+      setRecentInsights(Array.isArray(recentInsightsRes.data) ? recentInsightsRes.data : []);
+    } catch (insightsError) {
+      console.error("Failed to fetch recent insights:", insightsError);
+      setRecentInsights([]);
+    }
   };
 
   useEffect(() => {
@@ -950,6 +995,163 @@ export default function Dashboard() {
                 {performanceInsights.summary}
               </div>
             </div>
+          </section>
+
+          <section style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+                marginBottom: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h2
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "var(--text)",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Recent Insights
+                </h2>
+                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                  The latest saved reports and useful outputs generated across your agents.
+                </p>
+              </div>
+              <Link
+                href="/agents"
+                style={{
+                  color: "var(--accent)",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                Browse agents
+              </Link>
+            </div>
+
+            {recentInsights.length === 0 ? (
+              <AppStateCard
+                tone="neutral"
+                title="No recent insights yet"
+                description="Saved reports will appear here as your agents generate structured results. Run an agent or enable report-oriented workflows to start building this feed."
+                actions={
+                  <Link
+                    href="/agents"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      background: "var(--accent)",
+                      color: "#fff",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      textDecoration: "none",
+                    }}
+                  >
+                    Open agents
+                  </Link>
+                }
+              />
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                  gap: 14,
+                }}
+              >
+                {recentInsights.map((report) => (
+                  <Link
+                    key={report.id}
+                    href={`/agents/${report.agent_id}`}
+                    style={{
+                      display: "block",
+                      background: "var(--bg-2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 18,
+                      padding: 18,
+                      textDecoration: "none",
+                      minHeight: 190,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "6px 11px",
+                          borderRadius: 999,
+                          background: "rgba(217,121,85,0.1)",
+                          color: "var(--accent)",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {report.agent_name}
+                      </div>
+                      <div style={{ color: "var(--text-3)", fontSize: 12, whiteSpace: "nowrap" }}>
+                        {formatActivityTime(report.created_at)}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        color: "var(--text)",
+                        fontSize: 18,
+                        fontWeight: 700,
+                        lineHeight: 1.35,
+                        marginBottom: 10,
+                        letterSpacing: "-0.02em",
+                      }}
+                    >
+                      {extractInsightHeadline(report)}
+                    </div>
+
+                    <div
+                      style={{
+                        color: "var(--text-2)",
+                        fontSize: 14,
+                        lineHeight: 1.7,
+                        marginBottom: 18,
+                      }}
+                    >
+                      {extractInsightPreview(report)}
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop: "auto",
+                        paddingTop: 14,
+                        borderTop: "1px solid var(--border)",
+                        color: "var(--accent)",
+                        fontSize: 13,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Open agent chat
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </section>
 
           <section style={{ marginBottom: 28 }}>
