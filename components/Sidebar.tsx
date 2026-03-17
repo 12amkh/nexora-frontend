@@ -20,14 +20,15 @@ const NAV_ITEMS = [
 ];
 
 const subscribe = () => () => {};
-const getServerUserSnapshot = () => null;
-const getClientUserSnapshot = () => getUser();
+const getServerHydratedSnapshot = () => false;
+const getClientHydratedSnapshot = () => true;
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const cachedUser = useSyncExternalStore(subscribe, getClientUserSnapshot, getServerUserSnapshot);
+  const isHydrated = useSyncExternalStore(subscribe, getClientHydratedSnapshot, getServerHydratedSnapshot);
+  const cachedUser = isHydrated ? getUser() : null;
   const resolvedUser = user ?? cachedUser;
   const canSeeAdmin = resolvedUser?.is_admin === true;
   const plan = normalizePlan(resolvedUser?.plan);
