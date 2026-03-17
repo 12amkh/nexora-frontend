@@ -68,22 +68,42 @@ export default function WorkflowsPage() {
   const [running, setRunning] = useState(false)
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [workflowLoadError, setWorkflowLoadError] = useState('')
+  const [templateLoadError, setTemplateLoadError] = useState('')
 
   const loadData = async () => {
     setLoading(true)
     setError('')
+    setWorkflowLoadError('')
+    setTemplateLoadError('')
 
     try {
-      const [agentsRes, workflowsRes] = await Promise.all([
+      const [agentsResult, workflowsResult, templatesResult] = await Promise.allSettled([
         api.get('/agents/list?limit=100'),
         api.get('/workflows/list'),
+        api.get('/workflows/templates'),
       ])
-      const templatesRes = await api.get('/workflows/templates')
-      setAgents(Array.isArray(agentsRes.data) ? agentsRes.data : [])
-      setWorkflows(Array.isArray(workflowsRes.data) ? workflowsRes.data : [])
-      setTemplates(Array.isArray(templatesRes.data) ? templatesRes.data : [])
-    } catch (err: unknown) {
-      setError(getErrorMessage(err) || "We couldn't load workflows right now.")
+
+      if (agentsResult.status === 'fulfilled') {
+        setAgents(Array.isArray(agentsResult.value.data) ? agentsResult.value.data : [])
+      } else {
+        setAgents([])
+        setError(getErrorMessage(agentsResult.reason) || "We couldn't load your agents right now.")
+      }
+
+      if (workflowsResult.status === 'fulfilled') {
+        setWorkflows(Array.isArray(workflowsResult.value.data) ? workflowsResult.value.data : [])
+      } else {
+        setWorkflows([])
+        setWorkflowLoadError(getErrorMessage(workflowsResult.reason) || "We couldn't load workflows right now.")
+      }
+
+      if (templatesResult.status === 'fulfilled') {
+        setTemplates(Array.isArray(templatesResult.value.data) ? templatesResult.value.data : [])
+      } else {
+        setTemplates([])
+        setTemplateLoadError(getErrorMessage(templatesResult.reason) || "We couldn't load workflow templates right now.")
+      }
     } finally {
       setLoading(false)
     }
@@ -316,11 +336,11 @@ export default function WorkflowsPage() {
 
           {loading ? (
             <div style={{ color: 'var(--text-3)', fontSize: 14 }}>Loading workflows...</div>
-          ) : error && !workflows.length && !agents.length ? (
+          ) : error && !agents.length ? (
             <AppStateCard
               eyebrow='Workflows unavailable'
               icon='🔗'
-              title='Workflows could not be loaded'
+              title='Agents could not be loaded'
               description={error}
               tone='error'
               actions={<StateActionButton label='Retry workflows' onClick={() => void loadData()} />}
@@ -346,44 +366,56 @@ export default function WorkflowsPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
-                  {templates.map((template) => (
-                    <div
-                      key={template.id}
-                      style={{
-                        background: 'var(--bg-3)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 16,
-                        padding: 16,
-                        display: 'grid',
-                        gap: 12,
-                      }}
-                    >
-                      <div>
-                        <div style={{ color: 'var(--text)', fontSize: 17, fontWeight: 700, marginBottom: 6 }}>
-                          {template.title}
-                        </div>
-                        <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7 }}>
-                          {template.description}
-                        </div>
-                      </div>
-                      <div style={{ display: 'grid', gap: 8 }}>
-                        {template.steps.map((step, index) => (
-                          <div key={`${template.id}-${index}`} style={{ color: 'var(--text-3)', fontSize: 12, lineHeight: 1.6 }}>
-                            <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Step {index + 1}:</span> {step.name}
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        onClick={() => void handleApplyTemplate(template)}
-                        disabled={applyingTemplateId === template.id}
-                        style={primaryButtonStyle}
+                {templateLoadError ? (
+                  <AppStateCard
+                    eyebrow='Templates unavailable'
+                    icon='🧩'
+                    title='Workflow templates could not be loaded'
+                    description={templateLoadError}
+                    tone='error'
+                    compact
+                    actions={<StateActionButton label='Retry templates' onClick={() => void loadData()} />}
+                  />
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+                    {templates.map((template) => (
+                      <div
+                        key={template.id}
+                        style={{
+                          background: 'var(--bg-3)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 16,
+                          padding: 16,
+                          display: 'grid',
+                          gap: 12,
+                        }}
                       >
-                        {applyingTemplateId === template.id ? 'Creating...' : 'Use template'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                        <div>
+                          <div style={{ color: 'var(--text)', fontSize: 17, fontWeight: 700, marginBottom: 6 }}>
+                            {template.title}
+                          </div>
+                          <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7 }}>
+                            {template.description}
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gap: 8 }}>
+                          {template.steps.map((step, index) => (
+                            <div key={`${template.id}-${index}`} style={{ color: 'var(--text-3)', fontSize: 12, lineHeight: 1.6 }}>
+                              <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Step {index + 1}:</span> {step.name}
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => void handleApplyTemplate(template)}
+                          disabled={applyingTemplateId === template.id}
+                          style={primaryButtonStyle}
+                        >
+                          {applyingTemplateId === template.id ? 'Creating...' : 'Use template'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) minmax(0, 1fr)', gap: 22 }}>
@@ -512,7 +544,17 @@ export default function WorkflowsPage() {
                     </div>
                   </div>
 
-                  {workflows.length === 0 ? (
+                  {workflowLoadError ? (
+                    <AppStateCard
+                      eyebrow='Saved workflows unavailable'
+                      icon='🔗'
+                      title='Saved workflows could not be loaded'
+                      description={workflowLoadError}
+                      tone='error'
+                      compact
+                      actions={<StateActionButton label='Retry workflows' onClick={() => void loadData()} />}
+                    />
+                  ) : workflows.length === 0 ? (
                     <AppStateCard
                       eyebrow='No workflows yet'
                       icon='🔗'
