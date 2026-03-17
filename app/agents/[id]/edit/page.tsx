@@ -17,7 +17,6 @@ import { api, getErrorMessage } from "@/lib/api";
 interface AgentFormState {
   name: string;
   description: string;
-  is_public: boolean;
   // Behavior
   tone: string;
   response_length: string;
@@ -38,7 +37,6 @@ interface AgentFormState {
 const DEFAULT_FORM: AgentFormState = {
   name: "",
   description: "",
-  is_public: false,
   tone: "professional",
   response_length: "medium",
   language: "English",
@@ -68,6 +66,8 @@ export default function EditAgentPage({
   const [agentType, setAgentType] = useState(""); // read-only display badge
   const [loading, setLoading] = useState(true);   // true while fetching agent
   const [saving, setSaving] = useState(false);    // true while PUT is in flight
+  const [isPublic, setIsPublic] = useState(false);
+  const [publishingMarketplace, setPublishingMarketplace] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [error, setError] = useState("");
@@ -89,7 +89,6 @@ export default function EditAgentPage({
         setForm({
           name: agent.name ?? "",
           description: agent.description ?? "",
-          is_public: agent.is_public === true,
           tone: agent.config?.tone ?? "professional",
           response_length: agent.config?.response_length ?? "medium",
           language: agent.config?.language ?? "english",
@@ -102,6 +101,7 @@ export default function EditAgentPage({
           custom_knowledge: agent.config?.custom_knowledge ?? "",
           max_history: agent.config?.max_history ?? 20,
         });
+        setIsPublic(agent.is_public === true);
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "Failed to load agent";
@@ -158,7 +158,6 @@ export default function EditAgentPage({
       await api.put(`/agents/${id}`, {
         name: form.name,
         description: form.description,
-        is_public: form.is_public,
         config: {
           tone: form.tone,
           response_length: form.response_length,
@@ -193,6 +192,42 @@ export default function EditAgentPage({
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleMarketplacePublish = async (nextIsPublic: boolean) => {
+    if (publishingMarketplace) return;
+
+    setPublishingMarketplace(true);
+    const toastId = pushToast({
+      title: nextIsPublic ? "Publishing to marketplace" : "Removing from marketplace",
+      description: nextIsPublic
+        ? "Making this agent available in the Agent Marketplace right away."
+        : "Making this agent private again right away.",
+      tone: "loading",
+      dismissible: false,
+    });
+
+    try {
+      await api.put(`/agents/${id}`, { is_public: nextIsPublic });
+      setIsPublic(nextIsPublic);
+      updateToast(toastId, {
+        title: nextIsPublic ? "Published to marketplace" : "Removed from marketplace",
+        description: nextIsPublic
+          ? "This agent is now publicly available to import."
+          : "This agent is now private and no longer visible in the marketplace.",
+        tone: "success",
+        dismissible: true,
+      });
+    } catch (err: unknown) {
+      updateToast(toastId, {
+        title: nextIsPublic ? "Couldn't publish agent" : "Couldn't remove agent",
+        description: getErrorMessage(err),
+        tone: "error",
+        dismissible: true,
+      });
+    } finally {
+      setPublishingMarketplace(false);
     }
   };
 
@@ -440,48 +475,57 @@ export default function EditAgentPage({
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
                   <div>
                     <div style={{ color: "var(--text)", fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
-                      Publish to Marketplace
+                      {isPublic ? "Published to Marketplace" : "Publish to Marketplace"}
                     </div>
                     <div style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.7 }}>
-                      {form.is_public
-                        ? "This agent will be visible in the Agent Marketplace after you save your changes."
-                        : "Keep this agent private by default, or turn this on to make its template importable by other Nexora users."}
+                      {isPublic
+                        ? "This agent is live in the Agent Marketplace now. Changes to the form still need Save Changes, but publishing itself happens instantly."
+                        : "Keep this agent private by default, or publish it now to make its template importable by other Nexora users immediately."}
                     </div>
                   </div>
-                  <label style={{ position: "relative", display: "inline-block", width: 50, height: 28, cursor: "pointer", flexShrink: 0 }}>
-                    <input
-                      type="checkbox"
-                      name="is_public"
-                      checked={form.is_public}
-                      onChange={handleChange}
-                      style={{ opacity: 0, width: 0, height: 0 }}
-                    />
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: 0, left: 0, right: 0, bottom: 0,
-                        borderRadius: 999,
-                        background: form.is_public ? "var(--accent)" : "var(--bg-2)",
-                        border: `1px solid ${form.is_public ? "var(--accent)" : "var(--border-2)"}`,
-                        transition: "background 0.2s",
-                      }}
-                    />
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: 4,
-                        left: form.is_public ? 25 : 4,
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        background: "#fff",
-                        transition: "left 0.2s",
-                      }}
-                    />
-                  </label>
                 </div>
 
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => void handleMarketplacePublish(!isPublic)}
+                    disabled={publishingMarketplace}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: "none",
+                      background: "var(--accent)",
+                      color: "#fff",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor: publishingMarketplace ? "not-allowed" : "pointer",
+                      opacity: publishingMarketplace ? 0.8 : 1,
+                    }}
+                  >
+                    {publishingMarketplace
+                      ? "Saving..."
+                      : isPublic
+                        ? "Remove from marketplace"
+                        : "Add to marketplace"}
+                  </button>
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: "1px solid var(--border)",
+                      background: "transparent",
+                      color: isPublic ? "var(--accent)" : "var(--text-3)",
+                      fontSize: 13,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {isPublic ? "Public template" : "Private template"}
+                  </div>
                   <Link
                     href="/marketplace"
                     style={{
