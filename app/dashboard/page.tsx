@@ -121,6 +121,72 @@ function extractInsightPreview(report: RecentInsight) {
   return preview.length > 160 ? `${preview.slice(0, 157)}...` : preview;
 }
 
+function SectionToggleHeader({
+  open,
+  onToggle,
+  title,
+  description,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  title: string;
+  description: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 14,
+        border: "none",
+        background: "transparent",
+        padding: "2px 0",
+        cursor: "pointer",
+        textAlign: "left",
+        minWidth: 0,
+        flex: "1 1 320px",
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: 28,
+          minWidth: 28,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--text-3)",
+          fontSize: 18,
+          lineHeight: 1,
+          marginTop: 4,
+          transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          transition: "transform 0.2s ease",
+        }}
+      >
+        ▾
+      </span>
+      <div style={{ minWidth: 0 }}>
+        <h2
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: "var(--text)",
+            margin: "0 0 4px",
+            lineHeight: 1.2,
+          }}
+        >
+          {title}
+        </h2>
+        <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+          {description}
+        </p>
+      </div>
+    </button>
+  );
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const { pushToast, updateToast } = useToast();
@@ -128,7 +194,10 @@ export default function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [recentInsights, setRecentInsights] = useState<RecentInsight[]>([]);
+  const [performanceInsightsOpen, setPerformanceInsightsOpen] = useState(false);
   const [recentInsightsOpen, setRecentInsightsOpen] = useState(false);
+  const [recentActivityOpen, setRecentActivityOpen] = useState(false);
+  const [agentsOpen, setAgentsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
@@ -901,21 +970,12 @@ export default function Dashboard() {
                 flexWrap: "wrap",
               }}
             >
-              <div>
-                <h2
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: "var(--text)",
-                    margin: "0 0 4px",
-                  }}
-                >
-                  Agent Performance Insights
-                </h2>
-                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-                  A quick read on which agents and schedules are seeing the most tracked activity.
-                </p>
-              </div>
+              <SectionToggleHeader
+                open={performanceInsightsOpen}
+                onToggle={() => setPerformanceInsightsOpen((current) => !current)}
+                title="Agent Performance Insights"
+                description="A quick read on which agents and schedules are seeing the most tracked activity."
+              />
               <Link
                 href="/schedules"
                 style={{
@@ -929,7 +989,7 @@ export default function Dashboard() {
               </Link>
             </div>
 
-            <div
+            {!performanceInsightsOpen ? null : <div
               style={{
                 background: "var(--bg-2)",
                 border: "1px solid var(--border)",
@@ -995,7 +1055,7 @@ export default function Dashboard() {
               >
                 {performanceInsights.summary}
               </div>
-            </div>
+            </div>}
           </section>
 
           <section style={{ marginBottom: 28 }}>
@@ -1009,57 +1069,12 @@ export default function Dashboard() {
                 flexWrap: "wrap",
               }}
             >
-              <button
-                type="button"
-                onClick={() => setRecentInsightsOpen((current) => !current)}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 14,
-                  border: "none",
-                  background: "transparent",
-                  padding: "2px 0",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  minWidth: 0,
-                  flex: "1 1 320px",
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 24,
-                    minWidth: 24,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--text-3)",
-                    fontSize: 14,
-                    lineHeight: 1,
-                    marginTop: 6,
-                    transform: recentInsightsOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease",
-                  }}
-                >
-                  ▾
-                </span>
-                <div style={{ minWidth: 0 }}>
-                  <h2
-                    style={{
-                      fontSize: 20,
-                      fontWeight: 700,
-                      color: "var(--text)",
-                      margin: "0 0 4px",
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Recent Insights
-                  </h2>
-                  <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14, lineHeight: 1.5 }}>
-                    The latest saved reports and useful outputs generated across your agents.
-                  </p>
-                </div>
-              </button>
+              <SectionToggleHeader
+                open={recentInsightsOpen}
+                onToggle={() => setRecentInsightsOpen((current) => !current)}
+                title="Recent Insights"
+                description="The latest saved reports and useful outputs generated across your agents."
+              />
               <Link
                 href="/agents"
                 style={{
@@ -1201,24 +1216,15 @@ export default function Dashboard() {
                 marginBottom: 16,
               }}
             >
-              <div>
-                <h2
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: "var(--text)",
-                    margin: "0 0 4px",
-                  }}
-                >
-                  Recent Activity
-                </h2>
-                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
-                  The latest useful things happening across your agents and automations.
-                </p>
-              </div>
+              <SectionToggleHeader
+                open={recentActivityOpen}
+                onToggle={() => setRecentActivityOpen((current) => !current)}
+                title="Recent Activity"
+                description="The latest useful things happening across your agents and automations."
+              />
             </div>
 
-            {recentActivity.length === 0 ? (
+            {!recentActivityOpen ? null : recentActivity.length === 0 ? (
               <div
                 style={{
                   background: "var(--bg-2)",
@@ -1320,18 +1326,15 @@ export default function Dashboard() {
                 alignItems: "center",
                 gap: 16,
                 marginBottom: 22,
+                flexWrap: "wrap",
               }}
             >
-              <h2
-                style={{
-                  fontSize: 24,
-                  fontWeight: 700,
-                  color: "var(--text)",
-                  margin: 0,
-                }}
-              >
-                Your Agents
-              </h2>
+              <SectionToggleHeader
+                open={agentsOpen}
+                onToggle={() => setAgentsOpen((current) => !current)}
+                title="Your Agents"
+                description="Search, filter, and manage the agents currently in your workspace."
+              />
               <Link
                 href="/agents/new"
                 style={{
@@ -1347,7 +1350,7 @@ export default function Dashboard() {
                 </Link>
               </div>
 
-              {agents.length > 0 && (
+              {!agentsOpen ? null : agents.length > 0 && (
                 <div
                   style={{
                     display: "grid",
