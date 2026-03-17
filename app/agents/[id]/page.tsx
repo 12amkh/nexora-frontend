@@ -1,7 +1,7 @@
 'use client'
 
 import { use, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx'
 import { jsPDF } from 'jspdf'
@@ -103,6 +103,7 @@ function buildFollowUpPrompts(messages: Message[]): Array<{ label: string; promp
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { pushToast, updateToast } = useToast()
   const [agent, setAgent] = useState<Agent | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -124,6 +125,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const bottomRef = useRef<HTMLDivElement>(null)
   const recentContext = messages.slice(-4)
   const followUpActions = buildFollowUpPrompts(messages)
+  const requestedTab = searchParams.get('tab')
+  const requestedReportId = searchParams.get('report')
 
   useEffect(() => {
     const init = async () => {
@@ -151,6 +154,24 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
       loadReports()
     }
   }, [activeTab, reportsLoaded])
+
+  useEffect(() => {
+    if (requestedTab === 'reports' && activeTab !== 'reports') {
+      setActiveTab('reports')
+    }
+  }, [requestedTab, activeTab])
+
+  useEffect(() => {
+    if (!requestedReportId || !reports.length) return
+
+    const targetReportId = Number(requestedReportId)
+    if (!Number.isFinite(targetReportId)) return
+
+    const targetReport = reports.find(report => report.id === targetReportId)
+    if (targetReport) {
+      setPreviewReport(targetReport)
+    }
+  }, [requestedReportId, reports])
 
   const loadAgent = async () => {
     try {
