@@ -40,6 +40,7 @@ interface Report {
   id: number
   title: string
   content: string
+  share_id?: string | null
   created_at: string
 }
 
@@ -358,6 +359,40 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
     const blob = await Packer.toBlob(document)
     triggerBlobDownload(blob, `${report.title.replace(/[^\w\s-]+/g, '').trim() || 'report'}.docx`)
+  }
+
+  const handleShareReport = async (report: Report) => {
+    const toastId = pushToast({
+      title: 'Generating share link',
+      description: 'Preparing a public link for this report.',
+      tone: 'loading',
+      dismissible: false,
+    })
+
+    try {
+      const { data } = await api.post(`/agents/${id}/reports/${report.id}/share`)
+      const shareLink = `${window.location.origin}/reports/${data.share_id}`
+      await navigator.clipboard.writeText(shareLink)
+      setReports(prev =>
+        prev.map(item => (item.id === report.id ? { ...item, share_id: data.share_id } : item))
+      )
+      if (previewReport?.id === report.id) {
+        setPreviewReport({ ...report, share_id: data.share_id })
+      }
+      updateToast(toastId, {
+        title: 'Share link copied',
+        description: 'Anyone with the link can open this report.',
+        tone: 'success',
+        dismissible: true,
+      })
+    } catch (err: unknown) {
+      updateToast(toastId, {
+        title: "Couldn't share report",
+        description: getErrorMessage(err),
+        tone: 'error',
+        dismissible: true,
+      })
+    }
   }
 
   const sendMessage = async (presetMessage?: string) => {
@@ -994,6 +1029,21 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                         }}
                       >
                         DOCX
+                      </button>
+                      <button
+                        onClick={() => void handleShareReport(report)}
+                        style={{
+                          background: 'var(--bg-3)',
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 10,
+                          padding: '0.55rem 0.8rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Share Report
                       </button>
                     </div>
                   </div>
