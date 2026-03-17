@@ -22,6 +22,7 @@ interface AgentFormState {
   response_length: string;
   language: string;
   use_web_search: boolean;
+  report_mode: boolean;
   // Content
   instructions: string;
   welcome_message: string;
@@ -40,6 +41,7 @@ const DEFAULT_FORM: AgentFormState = {
   response_length: "medium",
   language: "English",
   use_web_search: true,
+  report_mode: false,
   instructions: "",
   welcome_message: "",
   focus_topics: "",
@@ -89,6 +91,7 @@ export default function EditAgentPage({
           response_length: agent.config?.response_length ?? "medium",
           language: agent.config?.language ?? "english",
           use_web_search: agent.config?.use_web_search ?? true,
+          report_mode: agent.config?.report_mode ?? false,
           instructions: agent.config?.instructions ?? "",
           welcome_message: agent.config?.welcome_message ?? "",
           focus_topics: focusArr.join(", "),
@@ -157,6 +160,7 @@ export default function EditAgentPage({
           response_length: form.response_length,
           language: form.language,
           use_web_search: form.use_web_search,
+          report_mode: form.report_mode,
           instructions: form.instructions,
           welcome_message: form.welcome_message,
           focus_topics: focusArr,
@@ -510,6 +514,59 @@ export default function EditAgentPage({
                       position: "absolute",
                       top: 3,
                       left: form.use_web_search ? 22 : 3,
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      background: "white",
+                      transition: "left 0.2s",
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "14px 16px",
+                  background: "var(--bg-3)",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  marginTop: 12,
+                }}
+              >
+                <div>
+                  <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 500 }}>
+                    Report mode
+                  </div>
+                  <div style={{ color: "var(--text-2)", fontSize: 12, marginTop: 2 }}>
+                    Return structured responses with Title, Summary, Key Insights, Analysis, Sources, and Conclusion.
+                  </div>
+                </div>
+                <label style={{ position: "relative", display: "inline-block", width: 44, height: 24, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    name="report_mode"
+                    checked={form.report_mode}
+                    onChange={handleChange}
+                    style={{ opacity: 0, width: 0, height: 0 }}
+                  />
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      borderRadius: 12,
+                      background: form.report_mode ? "var(--accent)" : "var(--bg-2)",
+                      border: `1px solid ${form.report_mode ? "var(--accent)" : "var(--border-2)"}`,
+                      transition: "background 0.2s",
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 3,
+                      left: form.report_mode ? 22 : 3,
                       width: 16,
                       height: 16,
                       borderRadius: "50%",

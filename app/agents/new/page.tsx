@@ -11,6 +11,7 @@ type AgentConfigForm = {
   use_web_search: boolean
   response_length: 'short' | 'medium' | 'detailed'
   welcome_message: string
+  report_mode: boolean
   focus_topics: string
   avoid_topics: string
 }
@@ -48,6 +49,7 @@ const DEFAULT_CONFIG: AgentConfigForm = {
   use_web_search: true,
   response_length: 'medium',
   welcome_message: '',
+  report_mode: false,
   focus_topics: '',
   avoid_topics: '',
 }
@@ -79,6 +81,7 @@ function getDefaultConfigForType(type: string): AgentConfigForm {
       instructions:
         'Monitor developments, summarize what changed, and separate signal from noise. Lead with the most meaningful developments, explain why they matter, and keep the output practical.',
       welcome_message: 'Hi! I can monitor important developments and summarize the strongest signals for you.',
+      report_mode: false,
       focus_topics: 'latest developments, notable launches, trend shifts, market signals',
       avoid_topics: 'unsupported rumors, vague hot takes, filler commentary',
     })
@@ -92,6 +95,7 @@ function getDefaultConfigForType(type: string): AgentConfigForm {
       instructions:
         'Compare competitors with a strategy lens. Highlight positioning, pricing, product movement, messaging changes, and what creates risk or opportunity.',
       welcome_message: 'Hi! I can compare competitors and surface what changed, why it matters, and where the opportunity is.',
+      report_mode: false,
       focus_topics: 'positioning, pricing, product updates, feature gaps, messaging shifts',
       avoid_topics: 'generic company descriptions, unsupported assumptions, hype',
     })
@@ -105,6 +109,7 @@ function getDefaultConfigForType(type: string): AgentConfigForm {
       instructions:
         'Research the topic from multiple angles, synthesize the strongest findings, and produce a structured answer with useful takeaways instead of a raw link dump.',
       welcome_message: 'Hi! Give me a topic or question and I will turn live research into a clear, useful brief.',
+      report_mode: false,
       focus_topics: 'recent sources, key findings, summaries, recommendations',
       avoid_topics: 'thin summaries, unsupported claims, repetitive source lists',
     })
@@ -118,6 +123,7 @@ function getDefaultConfigForType(type: string): AgentConfigForm {
       instructions:
         'Write with clear structure, strong hooks, and practical messaging. Optimize for clarity, momentum, and audience fit rather than generic filler.',
       welcome_message: 'Hi! I can help turn ideas into content drafts, angles, and polished messaging.',
+      report_mode: false,
       focus_topics: 'strong hooks, structure, audience fit, calls to action',
       avoid_topics: 'keyword stuffing, vague filler, robotic copy',
     })
@@ -131,6 +137,7 @@ function getDefaultConfigForType(type: string): AgentConfigForm {
       instructions:
         'Interpret information and turn it into decisions. Explain the key pattern, what changed, what to watch, and what action should follow.',
       welcome_message: 'Hi! I can interpret findings, spot patterns, and turn raw information into decisions.',
+      report_mode: false,
       focus_topics: 'patterns, insights, prioritization, implications',
       avoid_topics: 'raw data dumps, vague conclusions, unnecessary jargon',
     })
@@ -159,6 +166,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: true,
       response_length: 'detailed',
       welcome_message: 'Hi! I can monitor AI launches, funding, model updates, and the strongest market signals for you.',
+      report_mode: true,
       focus_topics: 'AI launches, model releases, startup funding, product strategy moves, market adoption signals',
       avoid_topics: 'celebrity AI gossip, unverified rumors, generic hype summaries',
     }),
@@ -178,6 +186,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: true,
       response_length: 'detailed',
       welcome_message: 'Hi! Tell me the competitor, market, or category you want analyzed and I will surface the important moves.',
+      report_mode: true,
       focus_topics: 'positioning, pricing, product updates, differentiation, messaging, strategic moves',
       avoid_topics: 'shallow company bios, unsupported speculation, broad market filler',
     }),
@@ -197,6 +206,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: true,
       response_length: 'detailed',
       welcome_message: 'Hi! I can generate startup ideas based on market gaps, demand signals, and underserved users.',
+      report_mode: true,
       focus_topics: 'pain points, market gaps, demand signals, target users, validation paths',
       avoid_topics: 'sci-fi moonshots, impossible business models, copied trend-chasing ideas',
     }),
@@ -216,6 +226,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: true,
       response_length: 'detailed',
       welcome_message: 'Hi! Share a market, niche, or customer segment and I will turn it into a practical research brief.',
+      report_mode: true,
       focus_topics: 'demand signals, customer segments, market dynamics, competitors, risks, opportunities',
       avoid_topics: 'outdated assumptions, vague TAM claims, unsupported certainty',
     }),
@@ -235,6 +246,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: true,
       response_length: 'detailed',
       welcome_message: 'Hi! I can help shape product direction, positioning, and roadmap priorities from market and user context.',
+      report_mode: true,
       focus_topics: 'product opportunities, prioritization, differentiation, roadmap decisions, user value',
       avoid_topics: 'feature dumping, vague brainstorming without prioritization, engineering implementation detail',
     }),
@@ -254,6 +266,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: true,
       response_length: 'medium',
       welcome_message: 'Hi! I can help you turn ideas, research, and goals into strong content angles, briefs, and drafts.',
+      report_mode: false,
       focus_topics: 'hooks, narratives, outlines, audience fit, conversion angles, editorial clarity',
       avoid_topics: 'generic fluff, repetitive AI phrasing, overstuffed SEO copy',
     }),
@@ -273,6 +286,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: true,
       response_length: 'detailed',
       welcome_message: 'Hi! Give me a topic, audience, or keyword theme and I will find SEO opportunities worth pursuing.',
+      report_mode: true,
       focus_topics: 'search intent, keyword clusters, topic gaps, SERP themes, content opportunities',
       avoid_topics: 'keyword stuffing, vanity metrics, low-intent traffic suggestions',
     }),
@@ -292,6 +306,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: false,
       response_length: 'detailed',
       welcome_message: 'Hi! I can help you design practical automations, schedules, and AI workflows that teams can actually maintain.',
+      report_mode: true,
       focus_topics: 'workflows, triggers, outputs, schedules, dependencies, operational clarity',
       avoid_topics: 'overengineered systems, vague productivity advice, unrealistic tooling assumptions',
     }),
@@ -311,6 +326,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: true,
       response_length: 'detailed',
       welcome_message: 'Hi! I can turn customer feedback, reviews, and user comments into themes and actionable insights.',
+      report_mode: true,
       focus_topics: 'pain points, jobs to be done, objections, emotional language, feature requests, satisfaction drivers',
       avoid_topics: 'single-comment overreactions, unsupported certainty, robotic summaries',
     }),
@@ -330,6 +346,7 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
       use_web_search: true,
       response_length: 'detailed',
       welcome_message: 'Hi! I can compile a weekly intelligence report covering the most important developments and why they matter.',
+      report_mode: true,
       focus_topics: 'weekly developments, notable changes, strategic signals, executive summaries, next-step watchpoints',
       avoid_topics: 'daily noise, duplicate stories, filler paragraphs without decisions',
     }),
@@ -616,6 +633,15 @@ export default function NewAgentPage() {
               style={fieldInputStyle}
             />
           </div>
+
+          <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.7rem', color: 'var(--text)', fontSize: '0.92rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={config.report_mode}
+              onChange={(event) => setConfig((prev) => ({ ...prev, report_mode: event.target.checked }))}
+            />
+            Enable report mode for structured report-style responses
+          </label>
 
           <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.7rem', color: 'var(--text)', fontSize: '0.92rem', cursor: 'pointer' }}>
             <input
