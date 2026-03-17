@@ -57,6 +57,7 @@ export default function Sidebar() {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
+  const notificationButtonRef = useRef<HTMLButtonElement | null>(null);
   const isHydrated = useSyncExternalStore(subscribe, getClientHydratedSnapshot, getServerHydratedSnapshot);
   const cachedUser = isHydrated ? getUser() : null;
   const resolvedUser = user ?? cachedUser;
@@ -141,6 +142,37 @@ export default function Sidebar() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const updatePosition = () => {
+      if (!notificationButtonRef.current || !notificationsRef.current) return;
+
+      const triggerRect = notificationButtonRef.current.getBoundingClientRect();
+      const dropdown = notificationsRef.current.querySelector("[data-notifications-panel='true']") as HTMLDivElement | null;
+      if (!dropdown) return;
+
+      const panelWidth = Math.min(360, window.innerWidth - 32);
+      const left = Math.min(
+        Math.max(16, triggerRect.right - panelWidth),
+        window.innerWidth - panelWidth - 16
+      );
+
+      dropdown.style.top = `${triggerRect.bottom + 10}px`;
+      dropdown.style.left = `${left}px`;
+      dropdown.style.width = `${panelWidth}px`;
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [notificationsOpen]);
 
   const unreadLabel = useMemo(() => {
     if (unreadCount <= 0) return null;
@@ -235,6 +267,7 @@ export default function Sidebar() {
         </Link>
         <div ref={notificationsRef} style={{ position: "relative" }}>
           <button
+            ref={notificationButtonRef}
             type="button"
             onClick={() => void handleOpenNotifications()}
             aria-label="Open notifications"
@@ -277,15 +310,16 @@ export default function Sidebar() {
 
           {notificationsOpen && (
             <div
+              data-notifications-panel="true"
               className="app-modal-card"
               style={{
-                position: "absolute",
-                top: 48,
-                right: 0,
+                position: "fixed",
+                top: 70,
+                left: 16,
                 width: 340,
-                maxWidth: "calc(100vw - 48px)",
+                maxWidth: "calc(100vw - 32px)",
                 padding: 16,
-                zIndex: 1200,
+                zIndex: 1300,
               }}
             >
               <div
