@@ -17,6 +17,7 @@ import { api, getErrorMessage } from "@/lib/api";
 interface AgentFormState {
   name: string;
   description: string;
+  is_public: boolean;
   // Behavior
   tone: string;
   response_length: string;
@@ -33,17 +34,11 @@ interface AgentFormState {
   max_history: number;
 }
 
-interface MarketplaceItem {
-  id: number;
-  title: string;
-  description: string;
-  owner_name: string;
-}
-
 // Default values used while the agent is loading (prevents uncontrolled→controlled flicker)
 const DEFAULT_FORM: AgentFormState = {
   name: "",
   description: "",
+  is_public: false,
   tone: "professional",
   response_length: "medium",
   language: "English",
@@ -75,9 +70,6 @@ export default function EditAgentPage({
   const [saving, setSaving] = useState(false);    // true while PUT is in flight
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [marketplaceItem, setMarketplaceItem] = useState<MarketplaceItem | null>(null);
-  const [marketplaceLoading, setMarketplaceLoading] = useState(true);
-  const [publishingMarketplace, setPublishingMarketplace] = useState(false);
   const [error, setError] = useState("");
 
   // ── Load agent on mount ──────────────────────────────────────────────────
@@ -97,6 +89,7 @@ export default function EditAgentPage({
         setForm({
           name: agent.name ?? "",
           description: agent.description ?? "",
+          is_public: agent.is_public === true,
           tone: agent.config?.tone ?? "professional",
           response_length: agent.config?.response_length ?? "medium",
           language: agent.config?.language ?? "english",
@@ -120,22 +113,6 @@ export default function EditAgentPage({
 
     fetchAgent();
   }, [id]); // re-run if id ever changes (e.g. back/forward navigation)
-
-  useEffect(() => {
-    const fetchMarketplaceState = async () => {
-      setMarketplaceLoading(true);
-      try {
-        const res = await api.get(`/marketplace/agents/${id}`);
-        setMarketplaceItem(res.data);
-      } catch {
-        setMarketplaceItem(null);
-      } finally {
-        setMarketplaceLoading(false);
-      }
-    };
-
-    fetchMarketplaceState();
-  }, [id]);
 
   // ── Generic change handler for all text/select/number inputs ─────────────
   // Using a single handler avoids one onChange per field boilerplate
@@ -181,6 +158,7 @@ export default function EditAgentPage({
       await api.put(`/agents/${id}`, {
         name: form.name,
         description: form.description,
+        is_public: form.is_public,
         config: {
           tone: form.tone,
           response_length: form.response_length,
@@ -251,72 +229,6 @@ export default function EditAgentPage({
       });
       setDeleting(false);
       setShowDeleteDialog(false);
-    }
-  };
-
-  const handlePublishMarketplace = async () => {
-    if (publishingMarketplace) return;
-
-    setPublishingMarketplace(true);
-    const toastId = pushToast({
-      title: marketplaceItem ? "Updating marketplace listing" : "Publishing to marketplace",
-      description: marketplaceItem
-        ? "Refreshing the public template with your latest agent setup."
-        : "Creating a public marketplace template from this agent.",
-      tone: "loading",
-      dismissible: false,
-    });
-
-    try {
-      const { data } = await api.post(`/marketplace/agents/${id}/publish`);
-      setMarketplaceItem(data);
-      updateToast(toastId, {
-        title: marketplaceItem ? "Marketplace listing updated" : "Agent published",
-        description: "This agent is now available in the Nexora marketplace.",
-        tone: "success",
-        dismissible: true,
-      });
-    } catch (err: unknown) {
-      updateToast(toastId, {
-        title: "Couldn't publish agent",
-        description: getErrorMessage(err),
-        tone: "error",
-        dismissible: true,
-      });
-    } finally {
-      setPublishingMarketplace(false);
-    }
-  };
-
-  const handleUnpublishMarketplace = async () => {
-    if (!marketplaceItem || publishingMarketplace) return;
-
-    setPublishingMarketplace(true);
-    const toastId = pushToast({
-      title: "Removing marketplace listing",
-      description: "Taking this agent out of the public marketplace.",
-      tone: "loading",
-      dismissible: false,
-    });
-
-    try {
-      await api.delete(`/marketplace/items/${marketplaceItem.id}`);
-      setMarketplaceItem(null);
-      updateToast(toastId, {
-        title: "Listing removed",
-        description: "This agent is private again and no longer visible in the marketplace.",
-        tone: "success",
-        dismissible: true,
-      });
-    } catch (err: unknown) {
-      updateToast(toastId, {
-        title: "Couldn't remove listing",
-        description: getErrorMessage(err),
-        tone: "error",
-        dismissible: true,
-      });
-    } finally {
-      setPublishingMarketplace(false);
     }
   };
 
@@ -525,59 +437,51 @@ export default function EditAgentPage({
                   gap: 12,
                 }}
               >
-                <div>
-                  <div style={{ color: "var(--text)", fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
-                    {marketplaceItem ? "Published in marketplace" : "Private by default"}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+                  <div>
+                    <div style={{ color: "var(--text)", fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+                      Publish to Marketplace
+                    </div>
+                    <div style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.7 }}>
+                      {form.is_public
+                        ? "This agent will be visible in the Agent Marketplace after you save your changes."
+                        : "Keep this agent private by default, or turn this on to make its template importable by other Nexora users."}
+                    </div>
                   </div>
-                  <div style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.7 }}>
-                    {marketplaceLoading
-                      ? "Checking whether this agent already has a marketplace listing..."
-                      : marketplaceItem
-                        ? `This agent is public as "${marketplaceItem.title}" and can be imported by other Nexora users.`
-                        : "Publish this agent to let other users browse its template and import a copy into their own account."}
-                  </div>
+                  <label style={{ position: "relative", display: "inline-block", width: 50, height: 28, cursor: "pointer", flexShrink: 0 }}>
+                    <input
+                      type="checkbox"
+                      name="is_public"
+                      checked={form.is_public}
+                      onChange={handleChange}
+                      style={{ opacity: 0, width: 0, height: 0 }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        borderRadius: 999,
+                        background: form.is_public ? "var(--accent)" : "var(--bg-2)",
+                        border: `1px solid ${form.is_public ? "var(--accent)" : "var(--border-2)"}`,
+                        transition: "background 0.2s",
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        left: form.is_public ? 25 : 4,
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: "#fff",
+                        transition: "left 0.2s",
+                      }}
+                    />
+                  </label>
                 </div>
 
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => void handlePublishMarketplace()}
-                    disabled={marketplaceLoading || publishingMarketplace}
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                      border: "none",
-                      background: "var(--accent)",
-                      color: "#fff",
-                      fontSize: 14,
-                      fontWeight: 700,
-                      cursor: marketplaceLoading || publishingMarketplace ? "not-allowed" : "pointer",
-                      opacity: marketplaceLoading || publishingMarketplace ? 0.8 : 1,
-                    }}
-                  >
-                    {publishingMarketplace
-                      ? "Saving..."
-                      : marketplaceItem
-                        ? "Update marketplace listing"
-                        : "Publish to marketplace"}
-                  </button>
-                  {marketplaceItem && (
-                    <button
-                      onClick={() => void handleUnpublishMarketplace()}
-                      disabled={publishingMarketplace}
-                      style={{
-                        padding: "10px 14px",
-                        borderRadius: 10,
-                        border: "1px solid var(--border)",
-                        background: "transparent",
-                        color: "var(--text)",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        cursor: publishingMarketplace ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      Remove listing
-                    </button>
-                  )}
                   <Link
                     href="/marketplace"
                     style={{
