@@ -825,12 +825,6 @@ export default function WorkflowsPage() {
                           <div style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700, marginBottom: 10 }}>
                             {step.agent_name}
                           </div>
-                          <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 10 }}>
-                            Prompt sent to this step
-                          </div>
-                          <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7, marginBottom: 14, whiteSpace: 'pre-wrap' }}>
-                            {step.prompt}
-                          </div>
                           <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 8 }}>
                             Output
                           </div>
