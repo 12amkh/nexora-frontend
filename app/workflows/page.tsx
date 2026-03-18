@@ -68,40 +68,6 @@ interface WorkflowRunHistoryItem {
 const SELECTED_WORKFLOW_STORAGE_KEY = 'nexora_selected_workflow_id'
 const SELECTED_WORKFLOW_RUN_STORAGE_KEY = 'nexora_selected_workflow_run_id'
 
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-
-const richContentToHtml = (content: string) => {
-  const blocks = parseRichContent(content)
-
-  return blocks.map((block) => {
-    if (block.type === 'heading') {
-      return `<h3 style="margin:0 0 12px;font-size:18px;line-height:1.35;font-weight:700;color:#111827;">${escapeHtml(block.content)}</h3>`
-    }
-
-    if (block.type === 'paragraph') {
-      return `<p style="margin:0 0 12px;font-size:14px;line-height:1.75;color:#374151;">${escapeHtml(block.content)}</p>`
-    }
-
-    if (block.type === 'bullet-list') {
-      const items = block.items
-        .map((item) => `<li style="margin:0 0 8px;color:#374151;">${escapeHtml(item)}</li>`)
-        .join('')
-      return `<ul style="margin:0 0 14px 20px;padding:0;font-size:14px;line-height:1.7;">${items}</ul>`
-    }
-
-    const items = block.items
-      .map((item) => `<li style="margin:0 0 8px;color:#374151;">${escapeHtml(item)}</li>`)
-      .join('')
-    return `<ol style="margin:0 0 14px 20px;padding:0;font-size:14px;line-height:1.7;">${items}</ol>`
-  }).join('')
-}
-
 export default function WorkflowsPage() {
   const router = useRouter()
   const { pushToast, updateToast } = useToast()
@@ -315,74 +281,153 @@ export default function WorkflowsPage() {
       const doc = new jsPDF({ unit: 'pt', format: 'a4' })
       const title = `${getWorkflowName(runResult.workflow_id)} Report`
       const generatedAt = formatRunTime(runResult.created_at || new Date().toISOString())
-      const stepsHtml = runResult.steps
-        .map(
-          (step, index) => `
-            <section style="padding:24px 0;border-top:${index === 0 ? 'none' : '1px solid #e5e7eb'};">
-              <div style="display:inline-block;margin-bottom:12px;padding:6px 12px;border-radius:999px;background:#f6ebe5;color:#d97955;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">
-                Step ${index + 1}
-              </div>
-              <h2 style="margin:0 0 14px;font-size:22px;line-height:1.3;font-weight:700;color:#111827;">
-                ${escapeHtml(step.agent_name)}
-              </h2>
-              <div style="font-size:14px;line-height:1.8;color:#374151;">
-                ${richContentToHtml(step.output)}
-              </div>
-            </section>
-          `
-        )
-        .join('')
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const margin = 44
+      const contentWidth = pageWidth - margin * 2
+      let cursorY = 46
 
-      const html = `
-        <div style="font-family:Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;padding:40px 44px;color:#111827;background:#ffffff;">
-          <div style="margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid #e5e7eb;">
-            <div style="display:inline-block;margin-bottom:16px;padding:8px 14px;border-radius:999px;background:#f6ebe5;color:#d97955;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">
-              Nexora Workflow Report
-            </div>
-            <h1 style="margin:0 0 10px;font-size:30px;line-height:1.2;font-weight:800;color:#111827;">
-              ${escapeHtml(title)}
-            </h1>
-            <div style="font-size:13px;line-height:1.6;color:#6b7280;">
-              Generated ${escapeHtml(generatedAt)}
-            </div>
-          </div>
+      const ensureSpace = (heightNeeded: number) => {
+        if (cursorY + heightNeeded <= pageHeight - 40) return
+        doc.addPage()
+        cursorY = 46
+      }
 
-          <section style="margin-bottom:28px;padding:22px 24px;border:1px solid #e5e7eb;border-radius:16px;background:#faf8f6;">
-            <h2 style="margin:0 0 14px;font-size:20px;line-height:1.3;font-weight:700;color:#111827;">Final Recommendation</h2>
-            <div style="font-size:14px;line-height:1.8;color:#374151;">
-              ${richContentToHtml(runResult.final_output)}
-            </div>
-          </section>
+      const drawDivider = () => {
+        ensureSpace(20)
+        doc.setDrawColor('#e5e7eb')
+        doc.setLineWidth(1)
+        doc.line(margin, cursorY, pageWidth - margin, cursorY)
+        cursorY += 20
+      }
 
-          <div style="margin-bottom:14px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#9ca3af;">
-            Workflow Steps
-          </div>
-          ${stepsHtml}
-        </div>
-      `
-
-      const container = document.createElement('div')
-      container.style.position = 'fixed'
-      container.style.left = '-10000px'
-      container.style.top = '0'
-      container.style.width = '760px'
-      container.style.background = '#ffffff'
-      container.innerHTML = html
-      document.body.appendChild(container)
-
-      await new Promise<void>((resolve) => {
-        doc.html(container, {
-          x: 0,
-          y: 0,
-          width: 595,
-          windowWidth: 760,
-          margin: [24, 24, 24, 24],
-          autoPaging: 'text',
-          callback: () => resolve(),
+      const drawWrappedParagraph = (text: string, options?: { fontSize?: number; color?: string; indent?: number; lineHeight?: number }) => {
+        const fontSize = options?.fontSize ?? 11
+        const color = options?.color ?? '#374151'
+        const indent = options?.indent ?? 0
+        const lineHeight = options?.lineHeight ?? 18
+        const lines = doc.splitTextToSize(text, contentWidth - indent)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(fontSize)
+        doc.setTextColor(color)
+        lines.forEach((line: string) => {
+          ensureSpace(lineHeight)
+          doc.text(line, margin + indent, cursorY)
+          cursorY += lineHeight
         })
+      }
+
+      const drawBlocks = (content: string) => {
+        const blocks = parseRichContent(content)
+        blocks.forEach((block) => {
+          if (block.type === 'heading') {
+            ensureSpace(26)
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(15)
+            doc.setTextColor('#111827')
+            doc.text(block.content, margin, cursorY)
+            cursorY += 24
+            return
+          }
+
+          if (block.type === 'paragraph') {
+            drawWrappedParagraph(block.content)
+            cursorY += 4
+            return
+          }
+
+          block.items.forEach((item, index) => {
+            const prefix = block.type === 'numbered-list' ? `${index + 1}.` : '•'
+            ensureSpace(18)
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(11)
+            doc.setTextColor('#d97955')
+            doc.text(prefix, margin, cursorY)
+            drawWrappedParagraph(item, { indent: 14 })
+          })
+          cursorY += 4
+        })
+      }
+
+      doc.setFillColor(246, 235, 229)
+      doc.roundedRect(margin, cursorY, 182, 26, 12, 12, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.setTextColor('#d97955')
+      doc.text('NEXORA WORKFLOW REPORT', margin + 14, cursorY + 17)
+      cursorY += 42
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(24)
+      doc.setTextColor('#111827')
+      const titleLines = doc.splitTextToSize(title, contentWidth)
+      titleLines.forEach((line: string) => {
+        ensureSpace(28)
+        doc.text(line, margin, cursorY)
+        cursorY += 28
       })
 
-      document.body.removeChild(container)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(11)
+      doc.setTextColor('#6b7280')
+      ensureSpace(18)
+      doc.text(`Generated ${generatedAt}`, margin, cursorY)
+      cursorY += 26
+
+      doc.setFillColor(250, 248, 246)
+      ensureSpace(120)
+      const summaryBoxY = cursorY
+      doc.roundedRect(margin, summaryBoxY, contentWidth, 64, 14, 14, 'F')
+      doc.setDrawColor('#e5e7eb')
+      doc.roundedRect(margin, summaryBoxY, contentWidth, 64, 14, 14, 'S')
+      cursorY += 20
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(18)
+      doc.setTextColor('#111827')
+      doc.text('Final Recommendation', margin + 18, cursorY)
+      cursorY += 20
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(11)
+      doc.setTextColor('#6b7280')
+      doc.text('Decision-ready summary from the final workflow step.', margin + 18, cursorY)
+      cursorY = summaryBoxY + 84
+
+      drawBlocks(runResult.final_output)
+      cursorY += 10
+      drawDivider()
+
+      ensureSpace(24)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.setTextColor('#9ca3af')
+      doc.text('WORKFLOW STEPS', margin, cursorY)
+      cursorY += 18
+
+      runResult.steps.forEach((step, index) => {
+        drawDivider()
+        ensureSpace(30)
+        doc.setFillColor(246, 235, 229)
+        doc.roundedRect(margin, cursorY, 74, 22, 10, 10, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(10)
+        doc.setTextColor('#d97955')
+        doc.text(`STEP ${index + 1}`, margin + 12, cursorY + 15)
+        cursorY += 34
+
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(19)
+        doc.setTextColor('#111827')
+        const stepTitleLines = doc.splitTextToSize(step.agent_name, contentWidth)
+        stepTitleLines.forEach((line: string) => {
+          ensureSpace(24)
+          doc.text(line, margin, cursorY)
+          cursorY += 24
+        })
+
+        cursorY += 2
+        drawBlocks(step.output)
+        cursorY += 10
+      })
 
       const fileName = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
       doc.save(fileName)
