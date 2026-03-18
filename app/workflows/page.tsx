@@ -63,6 +63,9 @@ interface WorkflowRunHistoryItem {
   created_at: string
 }
 
+const SELECTED_WORKFLOW_STORAGE_KEY = 'nexora_selected_workflow_id'
+const SELECTED_WORKFLOW_RUN_STORAGE_KEY = 'nexora_selected_workflow_run_id'
+
 export default function WorkflowsPage() {
   const router = useRouter()
   const { pushToast, updateToast } = useToast()
@@ -133,6 +136,24 @@ export default function WorkflowsPage() {
     void loadData()
   }, [router])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (selectedWorkflowId) {
+      window.localStorage.setItem(SELECTED_WORKFLOW_STORAGE_KEY, String(selectedWorkflowId))
+    } else {
+      window.localStorage.removeItem(SELECTED_WORKFLOW_STORAGE_KEY)
+    }
+  }, [selectedWorkflowId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (runResult?.id) {
+      window.localStorage.setItem(SELECTED_WORKFLOW_RUN_STORAGE_KEY, String(runResult.id))
+    } else {
+      window.localStorage.removeItem(SELECTED_WORKFLOW_RUN_STORAGE_KEY)
+    }
+  }, [runResult])
+
   const agentMap = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents])
 
   const resetForm = () => {
@@ -196,6 +217,43 @@ export default function WorkflowsPage() {
       })
     }
   }
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || loading || workflows.length === 0 || selectedWorkflowId) return
+
+    const storedWorkflowId = Number(window.localStorage.getItem(SELECTED_WORKFLOW_STORAGE_KEY))
+    if (!Number.isFinite(storedWorkflowId)) return
+
+    const workflow = workflows.find((item) => item.id === storedWorkflowId)
+    if (workflow) {
+      setSelectedWorkflowId(workflow.id)
+      setWorkflowName(workflow.name)
+      setWorkflowDescription(workflow.description || '')
+      setWorkflowAgentIds(workflow.agent_ids || [])
+      setRunResult(null)
+      void loadWorkflowRuns(workflow.id)
+    }
+  }, [loading, workflows, selectedWorkflowId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !selectedWorkflowId || loadingRuns || workflowRuns.length === 0 || runResult?.id) return
+
+    const storedRunId = Number(window.localStorage.getItem(SELECTED_WORKFLOW_RUN_STORAGE_KEY))
+    if (!Number.isFinite(storedRunId)) return
+
+    const run = workflowRuns.find((item) => item.id === storedRunId && item.workflow_id === selectedWorkflowId)
+    if (run) {
+      const restoreRun = async () => {
+        try {
+          const { data } = await api.get(`/workflows/${selectedWorkflowId}/runs/${run.id}`)
+          setRunResult(data)
+        } catch {
+          window.localStorage.removeItem(SELECTED_WORKFLOW_RUN_STORAGE_KEY)
+        }
+      }
+      void restoreRun()
+    }
+  }, [selectedWorkflowId, workflowRuns, loadingRuns, runResult])
 
   const handleAddAgentStep = () => {
     const nextId = Number(selectedAgentId)
