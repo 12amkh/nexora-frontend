@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { jsPDF } from 'jspdf'
 
 import Sidebar from '@/components/Sidebar'
 import { AppStateCard, StateActionButton } from '@/components/AppState'
 import { api, getErrorMessage, getUser } from '@/lib/api'
 import { useToast } from '@/components/ToastProvider'
-import RichContent from '@/components/RichContent'
+import RichContent, { parseRichContent } from '@/components/RichContent'
 
 interface Agent {
   id: number
@@ -51,6 +52,7 @@ interface WorkflowRunResult {
   status?: string
   steps: WorkflowRunStep[]
   created_at?: string | null
+  share_id?: string | null
 }
 
 interface WorkflowRunHistoryItem {
@@ -89,6 +91,8 @@ export default function WorkflowsPage() {
   const [workflowLoadError, setWorkflowLoadError] = useState('')
   const [templateLoadError, setTemplateLoadError] = useState('')
   const [runHistoryError, setRunHistoryError] = useState('')
+  const [sharingRun, setSharingRun] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   const loadData = async () => {
     setLoading(true)
@@ -215,6 +219,157 @@ export default function WorkflowsPage() {
         tone: 'error',
         dismissible: true,
       })
+    }
+  }
+
+  const getWorkflowName = (workflowId: number) => workflows.find((workflow) => workflow.id === workflowId)?.name || 'Workflow'
+
+  const buildWorkflowShareUrl = (shareId: string) => {
+    if (typeof window === 'undefined') return ''
+    return `${window.location.origin}/workflow-reports/${shareId}`
+  }
+
+  const handleShareRun = async () => {
+    if (!runResult?.id || !selectedWorkflowId || sharingRun) return
+
+    setSharingRun(true)
+    const toastId = pushToast({
+      title: 'Creating share link',
+      description: 'Preparing a public workflow report link.',
+      tone: 'loading',
+      dismissible: false,
+    })
+
+    try {
+      const { data } = await api.post(`/workflows/${selectedWorkflowId}/runs/${runResult.id}/share`)
+      const shareUrl = buildWorkflowShareUrl(data.share_id)
+      if (shareUrl) {
+        await navigator.clipboard.writeText(shareUrl)
+      }
+      setRunResult((current) => (current ? { ...current, share_id: data.share_id } : current))
+      setWorkflowRuns((current) => current.map((run) => (run.id === runResult.id ? { ...run, share_id: data.share_id } : run)))
+      updateToast(toastId, {
+        title: 'Share link ready',
+        description: shareUrl ? 'The workflow report link was copied to your clipboard.' : 'The workflow report link is ready.',
+        tone: 'success',
+        dismissible: true,
+      })
+    } catch (err: unknown) {
+      updateToast(toastId, {
+        title: "Couldn't share workflow report",
+        description: getErrorMessage(err),
+        tone: 'error',
+        dismissible: true,
+      })
+    } finally {
+      setSharingRun(false)
+    }
+  }
+
+  const handleExportPdf = async () => {
+    if (!runResult?.final_output || exportingPdf) return
+
+    setExportingPdf(true)
+    const toastId = pushToast({
+      title: 'Exporting PDF',
+      description: 'Building a shareable workflow report file.',
+      tone: 'loading',
+      dismissible: false,
+    })
+
+    try {
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const marginX = 48
+      let cursorY = 54
+
+      const addWrappedText = (text: string, fontSize: number, color: string, lineHeight: number, indent = 0) => {
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(fontSize)
+        doc.setTextColor(color)
+        const lines = doc.splitTextToSize(text, pageWidth - marginX * 2 - indent)
+        lines.forEach((line: string) => {
+          if (cursorY > pageHeight - 54) {
+            doc.addPage()
+            cursorY = 54
+          }
+          doc.text(line, marginX + indent, cursorY)
+          cursorY += lineHeight
+        })
+      }
+
+      const blocks = parseRichContent(runResult.final_output)
+      const title = `${getWorkflowName(runResult.workflow_id)} Report`
+
+      doc.setFillColor(246, 235, 229)
+      doc.roundedRect(marginX, cursorY, 170, 28, 12, 12, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.setTextColor('#d97955')
+      doc.text('NEXORA WORKFLOW REPORT', marginX + 14, cursorY + 18)
+      cursorY += 48
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(24)
+      doc.setTextColor('#1f2937')
+      const titleLines = doc.splitTextToSize(title, pageWidth - marginX * 2)
+      titleLines.forEach((line: string) => {
+        doc.text(line, marginX, cursorY)
+        cursorY += 28
+      })
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(11)
+      doc.setTextColor('#6b7280')
+      doc.text(`Generated ${formatRunTime(runResult.created_at || new Date().toISOString())}`, marginX, cursorY)
+      cursorY += 28
+
+      blocks.forEach((block) => {
+        if (block.type === 'heading') {
+          if (cursorY > pageHeight - 90) {
+            doc.addPage()
+            cursorY = 54
+          }
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(15)
+          doc.setTextColor('#1f2937')
+          doc.text(block.content, marginX, cursorY)
+          cursorY += 22
+          return
+        }
+
+        if (block.type === 'paragraph') {
+          addWrappedText(block.content, 11, '#374151', 18)
+          cursorY += 6
+          return
+        }
+
+        const items = block.items
+        items.forEach((item, index) => {
+          const prefix = block.type === 'numbered-list' ? `${index + 1}. ` : '• '
+          addWrappedText(`${prefix}${item}`, 11, '#374151', 18, 10)
+        })
+        cursorY += 8
+      })
+
+      const fileName = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
+      doc.save(fileName)
+      updateToast(toastId, {
+        title: 'PDF exported',
+        description: 'The workflow report PDF was downloaded.',
+        tone: 'success',
+        dismissible: true,
+      })
+    } catch (err: unknown) {
+      updateToast(toastId, {
+        title: "Couldn't export PDF",
+        description: err instanceof Error ? err.message : 'The workflow report could not be exported.',
+        tone: 'error',
+        dismissible: true,
+      })
+    } finally {
+      setExportingPdf(false)
     }
   }
 
@@ -872,6 +1027,20 @@ export default function WorkflowsPage() {
                           Status: {runResult.status}
                         </div>
                       )}
+                      {runResult.share_id && (
+                        <div style={metaPillStyle}>
+                          Shared
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <button onClick={() => void handleShareRun()} disabled={!runResult.id || sharingRun} style={secondaryButtonStyle}>
+                        {sharingRun ? 'Sharing...' : 'Share report'}
+                      </button>
+                      <button onClick={() => void handleExportPdf()} disabled={exportingPdf} style={secondaryButtonStyle}>
+                        {exportingPdf ? 'Exporting...' : 'Export PDF'}
+                      </button>
                     </div>
 
                     <div style={{ display: 'grid', gap: 12 }}>
