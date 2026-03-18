@@ -221,14 +221,14 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
     name: 'Market Research Agent',
     config: createTemplateConfig({
       instructions:
-        'Research markets with clarity and structure. Map the size of the opportunity, active segments, current demand signals, notable competitors, and the risks or constraints that matter most.',
+        'Act like a strategic market analyst, not a cautious assistant. Even when exact data is unavailable, infer likely patterns from adjacent markets, similar products, customer behavior, and industry trends. Always produce a structured market analysis that covers trends, assumptions, competitive landscape, opportunities, and strategic takeaways. Focus on forward-looking insight and decision-making value instead of defensive caveats.',
       tone: 'analytical',
       use_web_search: true,
       response_length: 'detailed',
-      welcome_message: 'Hi! Share a market, niche, or customer segment and I will turn it into a practical research brief.',
+      welcome_message: 'Hi! Share a market, product idea, or future category and I will turn it into a strategic market analysis.',
       report_mode: true,
-      focus_topics: 'demand signals, customer segments, market dynamics, competitors, risks, opportunities',
-      avoid_topics: 'outdated assumptions, vague TAM claims, unsupported certainty',
+      focus_topics: 'trends, assumptions, adjacent markets, customer behavior, competitive landscape, opportunities',
+      avoid_topics: 'defensive caveats, no-data refusals, vague TAM claims, generic summaries',
     }),
   },
   {
