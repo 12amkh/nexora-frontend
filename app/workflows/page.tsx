@@ -44,10 +44,23 @@ interface WorkflowRunStep {
 }
 
 interface WorkflowRunResult {
+  id?: number | null
   workflow_id: number
   input: string
   final_output: string
+  status?: string
   steps: WorkflowRunStep[]
+  created_at?: string | null
+}
+
+interface WorkflowRunHistoryItem {
+  id: number
+  workflow_id: number
+  status: string
+  input: string
+  final_output: string
+  error_message: string
+  created_at: string
 }
 
 export default function WorkflowsPage() {
@@ -63,13 +76,16 @@ export default function WorkflowsPage() {
   const [workflowAgentIds, setWorkflowAgentIds] = useState<number[]>([])
   const [workflowInput, setWorkflowInput] = useState('')
   const [runResult, setRunResult] = useState<WorkflowRunResult | null>(null)
+  const [workflowRuns, setWorkflowRuns] = useState<WorkflowRunHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [running, setRunning] = useState(false)
+  const [loadingRuns, setLoadingRuns] = useState(false)
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [workflowLoadError, setWorkflowLoadError] = useState('')
   const [templateLoadError, setTemplateLoadError] = useState('')
+  const [runHistoryError, setRunHistoryError] = useState('')
 
   const loadData = async () => {
     setLoading(true)
@@ -126,7 +142,23 @@ export default function WorkflowsPage() {
     setWorkflowAgentIds([])
     setWorkflowInput('')
     setRunResult(null)
+    setWorkflowRuns([])
+    setRunHistoryError('')
     setSelectedAgentId('')
+  }
+
+  const loadWorkflowRuns = async (workflowId: number) => {
+    setLoadingRuns(true)
+    setRunHistoryError('')
+    try {
+      const { data } = await api.get(`/workflows/${workflowId}/runs`)
+      setWorkflowRuns(Array.isArray(data) ? data : [])
+    } catch (err: unknown) {
+      setWorkflowRuns([])
+      setRunHistoryError(getErrorMessage(err) || "We couldn't load workflow runs right now.")
+    } finally {
+      setLoadingRuns(false)
+    }
   }
 
   const handleSelectWorkflow = (workflow: Workflow) => {
@@ -135,6 +167,34 @@ export default function WorkflowsPage() {
     setWorkflowDescription(workflow.description || '')
     setWorkflowAgentIds(workflow.agent_ids || [])
     setRunResult(null)
+    void loadWorkflowRuns(workflow.id)
+  }
+
+  const handleOpenRun = async (workflowId: number, runId: number) => {
+    const toastId = pushToast({
+      title: 'Opening workflow run',
+      description: 'Loading the saved run details.',
+      tone: 'loading',
+      dismissible: false,
+    })
+
+    try {
+      const { data } = await api.get(`/workflows/${workflowId}/runs/${runId}`)
+      setRunResult(data)
+      updateToast(toastId, {
+        title: 'Workflow run loaded',
+        description: 'Saved run details are now open below.',
+        tone: 'success',
+        dismissible: true,
+      })
+    } catch (err: unknown) {
+      updateToast(toastId, {
+        title: "Couldn't open workflow run",
+        description: getErrorMessage(err),
+        tone: 'error',
+        dismissible: true,
+      })
+    }
   }
 
   const handleAddAgentStep = () => {
@@ -236,6 +296,7 @@ export default function WorkflowsPage() {
         input: workflowInput,
       })
       setRunResult(data)
+      await loadWorkflowRuns(workflow.id)
       updateToast(toastId, {
         title: `${workflow.name} finished`,
         description: 'The workflow completed successfully.',
@@ -269,6 +330,10 @@ export default function WorkflowsPage() {
         resetForm()
       }
       await loadData()
+      if (selectedWorkflowId === workflowId) {
+        setWorkflowRuns([])
+        setRunResult(null)
+      }
       updateToast(toastId, {
         title: 'Workflow deleted',
         description: 'The workflow was removed successfully.',
@@ -283,6 +348,12 @@ export default function WorkflowsPage() {
         dismissible: true,
       })
     }
+  }
+
+  const formatRunTime = (value: string) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return 'Unknown time'
+    return date.toLocaleString()
   }
 
   const handleApplyTemplate = async (template: WorkflowTemplate) => {
@@ -611,6 +682,107 @@ export default function WorkflowsPage() {
                   />
                 </div>
 
+                <div
+                  style={{
+                    background: 'var(--bg-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 18,
+                    padding: 18,
+                    display: 'grid',
+                    gap: 16,
+                  }}
+                >
+                  <div>
+                    <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
+                      Run history
+                    </div>
+                    <div style={{ color: 'var(--text-2)', fontSize: 14 }}>
+                      Review past workflow executions, their status, and open any saved run to inspect all steps again.
+                    </div>
+                  </div>
+
+                  {!selectedWorkflowId ? (
+                    <AppStateCard
+                      eyebrow='Choose a workflow'
+                      icon='🕘'
+                      title='Select a workflow to view its run history'
+                      description='Pick a saved workflow above and its previous runs will appear here.'
+                      tone='neutral'
+                      compact
+                    />
+                  ) : loadingRuns ? (
+                    <div style={{ color: 'var(--text-3)', fontSize: 14 }}>Loading run history...</div>
+                  ) : runHistoryError ? (
+                    <AppStateCard
+                      eyebrow='Run history unavailable'
+                      icon='🕘'
+                      title='Workflow runs could not be loaded'
+                      description={runHistoryError}
+                      tone='error'
+                      compact
+                      actions={<StateActionButton label='Retry run history' onClick={() => void loadWorkflowRuns(selectedWorkflowId)} />}
+                    />
+                  ) : workflowRuns.length === 0 ? (
+                    <AppStateCard
+                      eyebrow='No runs yet'
+                      icon='🕘'
+                      title='This workflow has not been run yet'
+                      description='Run the workflow once and its full step-by-step history will be saved here.'
+                      tone='neutral'
+                      compact
+                    />
+                  ) : (
+                    <div style={{ display: 'grid', gap: 12 }}>
+                      {workflowRuns.map((run) => (
+                        <div
+                          key={run.id}
+                          style={{
+                            background: 'var(--bg-3)',
+                            border: runResult?.id === run.id ? '1px solid rgba(217,121,85,0.28)' : '1px solid var(--border)',
+                            borderRadius: 16,
+                            padding: 16,
+                            display: 'grid',
+                            gap: 10,
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                            <div>
+                              <div style={{ color: 'var(--text)', fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+                                Run #{run.id}
+                              </div>
+                              <div style={{ color: 'var(--text-3)', fontSize: 12 }}>
+                                {formatRunTime(run.created_at)}
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: 999,
+                                background: run.status === 'completed' ? 'rgba(74, 222, 128, 0.12)' : 'rgba(248, 113, 113, 0.12)',
+                                color: run.status === 'completed' ? '#86efac' : '#fca5a5',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                letterSpacing: '0.08em',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              {run.status}
+                            </div>
+                          </div>
+                          <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7 }}>
+                            {run.input.length > 180 ? `${run.input.slice(0, 180)}...` : run.input}
+                          </div>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            <button onClick={() => void handleOpenRun(run.workflow_id, run.id)} style={secondaryButtonStyle}>
+                              Open run
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {runResult && (
                   <div
                     style={{
@@ -624,11 +796,24 @@ export default function WorkflowsPage() {
                   >
                     <div>
                       <div style={{ color: 'var(--text)', fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
-                        Workflow result
+                        {runResult.id ? `Workflow run #${runResult.id}` : 'Workflow result'}
                       </div>
                       <div style={{ color: 'var(--text-2)', fontSize: 14 }}>
                         Each step reused the previous output as context for the next agent.
                       </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {runResult.created_at && (
+                        <div style={metaPillStyle}>
+                          {formatRunTime(runResult.created_at)}
+                        </div>
+                      )}
+                      {runResult.status && (
+                        <div style={metaPillStyle}>
+                          Status: {runResult.status}
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ display: 'grid', gap: 12 }}>
@@ -707,4 +892,14 @@ const secondaryIconButtonStyle: React.CSSProperties = {
   color: 'var(--text)',
   fontWeight: 700,
   cursor: 'pointer',
+}
+
+const metaPillStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  borderRadius: 999,
+  border: '1px solid var(--border)',
+  background: 'var(--bg-3)',
+  color: 'var(--text-2)',
+  fontSize: 12,
+  fontWeight: 600,
 }
