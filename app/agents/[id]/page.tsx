@@ -63,12 +63,99 @@ function formatDateDivider(value?: string): string | null {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function buildFollowUpPrompts(messages: Message[]): Array<{ label: string; prompt: string }> {
+function buildFollowUpPrompts(messages: Message[], agent: Agent | null): Array<{ label: string; prompt: string }> {
   const lastAssistant = [...messages].reverse().find(message => message.role === 'assistant' && message.content.trim())
   if (!lastAssistant) return []
 
   const lastReply = lastAssistant.content.replace(/\s+/g, ' ').trim()
   const preview = lastReply.length > 220 ? `${lastReply.slice(0, 217).trimEnd()}...` : lastReply
+  const normalizedName = agent?.name.toLowerCase() || ''
+  const agentType = agent?.config?.agent_type || 'custom'
+
+  if (normalizedName.includes('startup idea generator')) {
+    return [
+      {
+        label: 'Narrow the wedge',
+        prompt: `Narrow your last answer into one sharper wedge with a more specific target user, workflow pain, and buildable MVP.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Stress-test idea',
+        prompt: `Stress-test the strongest startup idea from your last answer. Show why it could fail, what assumption matters most, and how to validate it quickly.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Build next step',
+        prompt: `Turn your last answer into the next concrete build step: what should be built first, for whom, and why.\n\nPrevious answer:\n${preview}`,
+      },
+    ]
+  }
+
+  if (normalizedName.includes('market research agent') || agentType === 'web_researcher') {
+    return [
+      {
+        label: 'Find deeper gaps',
+        prompt: `Go beyond your last answer and surface deeper workflow gaps, buyer pain, and non-obvious constraints in this market.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Why now matters',
+        prompt: `Use your last answer and explain why this market matters now, including timing, demand, cost, or behavior shifts.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Turn research into idea',
+        prompt: `Convert your last research answer into 2 or 3 startup wedges with target users, exact problems, and what to build first.\n\nPrevious answer:\n${preview}`,
+      },
+    ]
+  }
+
+  if (normalizedName.includes('competitor analyzer') || agentType === 'competitor_analyst') {
+    return [
+      {
+        label: 'Find weak spots',
+        prompt: `Use your last answer to surface the weakest spots in competitor coverage, messaging, or product execution.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Find wedge against them',
+        prompt: `Turn your last competitor analysis into one startup wedge that could beat or bypass these competitors.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Recommend next move',
+        prompt: `Based on your last answer, recommend the best next strategic move and justify it clearly.\n\nPrevious answer:\n${preview}`,
+      },
+    ]
+  }
+
+  if (normalizedName.includes('weekly intelligence report') || normalizedName.includes('weekly report')) {
+    return [
+      {
+        label: 'Make it more decisive',
+        prompt: `Take your last answer and make the recommendation more decisive. Choose one clear winner and sharpen the reasoning.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Sharpen action plan',
+        prompt: `Turn your last answer into a tighter execution plan with clearer immediate next steps and practical sequencing.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Stress-test risks',
+        prompt: `Use your last answer and stress-test the recommendation: what are the biggest risks, and how should they be mitigated?\n\nPrevious answer:\n${preview}`,
+      },
+    ]
+  }
+
+  if (agentType === 'data_interpreter') {
+    return [
+      {
+        label: 'Rank opportunities',
+        prompt: `Rework your last answer by ranking the opportunities more clearly and explaining why the top one comes first.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Find hidden contradiction',
+        prompt: `Go deeper on your last answer and surface the most important contradiction, tension, or hidden pattern.\n\nPrevious answer:\n${preview}`,
+      },
+      {
+        label: 'Turn into strategy',
+        prompt: `Turn your last answer into sharper strategy: what should happen next, what should wait, and what matters most.\n\nPrevious answer:\n${preview}`,
+      },
+    ]
+  }
 
   return [
     {
@@ -225,7 +312,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const [upgradeMessage, setUpgradeMessage] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const recentContext = messages.slice(-4)
-  const followUpActions = buildFollowUpPrompts(messages)
+  const followUpActions = buildFollowUpPrompts(messages, agent)
   const quickActions = getQuickActions(agent)
   const requestedTab = searchParams.get('tab')
   const requestedReportId = searchParams.get('report')

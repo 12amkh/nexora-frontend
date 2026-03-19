@@ -65,8 +65,78 @@ interface WorkflowRunHistoryItem {
   created_at: string
 }
 
+interface WorkflowDecisionHighlight {
+  label: string
+  value: string
+  detail: string
+}
+
 const SELECTED_WORKFLOW_STORAGE_KEY = 'nexora_selected_workflow_id'
 const SELECTED_WORKFLOW_RUN_STORAGE_KEY = 'nexora_selected_workflow_run_id'
+
+function normalizeTextBlock(value?: string | null) {
+  return (value || '').replace(/\r/g, '').trim()
+}
+
+function extractSectionContent(content: string, headings: string[]) {
+  const normalized = normalizeTextBlock(content)
+  if (!normalized) return ''
+
+  const lines = normalized.split('\n')
+  const normalizedHeadings = headings.map((heading) => heading.toLowerCase())
+  let active = false
+  const collected: string[] = []
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    const headingMatch = line.match(/^(?:#{1,6}\s*)?(?:\d+[\.\)]\s*)?(.+?)\s*:?$/)
+    const headingText = headingMatch?.[1]?.trim().toLowerCase() || ''
+    const isKnownHeading = normalizedHeadings.includes(headingText)
+
+    if (isKnownHeading) {
+      active = true
+      continue
+    }
+
+    if (active && headingMatch && /^(?:#{1,6}\s*)?(?:\d+[\.\)]\s*)?[A-Za-z].*$/.test(line) && !line.startsWith('-') && !line.startsWith('*') && !line.startsWith('•')) {
+      break
+    }
+
+    if (active) {
+      collected.push(rawLine)
+    }
+  }
+
+  return collected.join('\n').trim()
+}
+
+function getExcerpt(content: string, maxLength = 180) {
+  const plain = normalizeTextBlock(content).replace(/^#+\s*/gm, '').replace(/\s+/g, ' ')
+  if (!plain) return 'No saved output yet.'
+  return plain.length > maxLength ? `${plain.slice(0, maxLength - 3).trimEnd()}...` : plain
+}
+
+function getWorkflowErrorGuidance(error: string) {
+  const normalized = error.toLowerCase()
+
+  if (normalized.includes('429') || normalized.includes('too many requests') || normalized.includes('rate limit')) {
+    return 'The model provider is being rate-limited right now. Wait a moment, then rerun the workflow. Your workflow setup and past runs are still safe.'
+  }
+
+  if (normalized.includes('402') || normalized.includes('payment required')) {
+    return 'The model provider rejected the request because billing or credits are unavailable. Update the active provider account, then retry the same workflow.'
+  }
+
+  if (normalized.includes('502') || normalized.includes('bad gateway')) {
+    return 'The workflow service hit an upstream model error. Retry the run once first. If it repeats, the provider configuration or fallback chain likely needs attention.'
+  }
+
+  if (normalized.includes('network') || normalized.includes('fetch')) {
+    return 'The request did not complete cleanly. Check your connection or backend availability, then rerun the workflow once the service is reachable again.'
+  }
+
+  return 'The workflow was saved, but the latest run did not complete. You can retry the same workflow without rebuilding it.'
+}
 
 export default function WorkflowsPage() {
   const router = useRouter()
@@ -174,6 +244,41 @@ export default function WorkflowsPage() {
       return 0
     })
   }, [templates, featuredTemplateId])
+  const selectedWorkflow = useMemo(
+    () => workflows.find((workflow) => workflow.id === selectedWorkflowId) || null,
+    [workflows, selectedWorkflowId],
+  )
+  const workflowDecisionHighlights = useMemo<WorkflowDecisionHighlight[]>(() => {
+    if (!runResult?.final_output) return []
+
+    const winningOpportunity = extractSectionContent(runResult.final_output, ['Winning Opportunity', 'Best Opportunity'])
+    const targetUser = extractSectionContent(runResult.final_output, ['Target User', 'Target Market'])
+    const buildFirst = extractSectionContent(runResult.final_output, ['What To Build First', 'What to Build First'])
+    const whyNow = extractSectionContent(runResult.final_output, ['Why this works NOW', 'Why It Wins', 'Why Now'])
+
+    return [
+      {
+        label: 'Winning opportunity',
+        value: getExcerpt(winningOpportunity, 120),
+        detail: 'The single idea this workflow believes is most worth pursuing.',
+      },
+      {
+        label: 'Target user',
+        value: getExcerpt(targetUser, 100),
+        detail: 'Who this recommendation is for and who should care first.',
+      },
+      {
+        label: 'What to build first',
+        value: getExcerpt(buildFirst, 120),
+        detail: 'The narrow MVP wedge the final recommendation is pushing you toward.',
+      },
+      {
+        label: 'Why now',
+        value: getExcerpt(whyNow, 120),
+        detail: 'The timing signal or market pressure that makes this worth acting on now.',
+      },
+    ]
+  }, [runResult])
 
   const resetForm = () => {
     setSelectedWorkflowId(null)
@@ -964,7 +1069,21 @@ export default function WorkflowsPage() {
                   })}
                 </div>
 
-                {error && <div style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>}
+                {error ? (
+                  <AppStateCard
+                    eyebrow='Workflow feedback'
+                    icon='⚠️'
+                    title='The latest workflow action needs attention'
+                    description={error}
+                    tone='error'
+                    compact
+                    actions={
+                      <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7, maxWidth: 520 }}>
+                        {getWorkflowErrorGuidance(error)}
+                      </div>
+                    }
+                  />
+                ) : null}
 
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <button onClick={() => void handleSaveWorkflow()} disabled={saving} style={primaryButtonStyle}>
@@ -1061,6 +1180,21 @@ export default function WorkflowsPage() {
                     rows={4}
                     style={{ ...fieldStyle, resize: 'vertical', fontFamily: 'inherit' }}
                   />
+                  <div
+                    style={{
+                      background: 'var(--bg-3)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 14,
+                      padding: '12px 14px',
+                      color: 'var(--text-2)',
+                      fontSize: 13,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {selectedWorkflow
+                      ? `${selectedWorkflow.name} will run ${selectedWorkflow.agent_ids.length} step${selectedWorkflow.agent_ids.length === 1 ? '' : 's'} in sequence, save the full run to history, and keep the final report ready for sharing or export.`
+                      : 'Pick a saved workflow first, then add starting context so Nexora can run the full chain and save every step.'}
+                  </div>
                 </div>
 
                 <div
@@ -1153,6 +1287,21 @@ export default function WorkflowsPage() {
                           <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7 }}>
                             {run.input.length > 180 ? `${run.input.slice(0, 180)}...` : run.input}
                           </div>
+                          {run.error_message ? (
+                            <div
+                              style={{
+                                background: 'rgba(248, 113, 113, 0.08)',
+                                border: '1px solid rgba(248, 113, 113, 0.18)',
+                                borderRadius: 12,
+                                padding: '10px 12px',
+                                color: '#fca5a5',
+                                fontSize: 12,
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              {run.error_message}
+                            </div>
+                          ) : null}
                           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                             <button onClick={() => void handleOpenRun(run.workflow_id, run.id)} style={secondaryButtonStyle}>
                               Open run
@@ -1180,7 +1329,7 @@ export default function WorkflowsPage() {
                         {runResult.id ? `Workflow run #${runResult.id}` : 'Workflow result'}
                       </div>
                       <div style={{ color: 'var(--text-2)', fontSize: 14 }}>
-                        Each step reused the previous output as context for the next agent.
+                        Each step reused the previous output as context for the next agent, and the final section below is formatted as the main decision memo.
                       </div>
                     </div>
 
@@ -1202,6 +1351,90 @@ export default function WorkflowsPage() {
                       )}
                     </div>
 
+                    {runResult.status === 'completed' ? (
+                      <div
+                        style={{
+                          background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--bg-3)) 0%, var(--bg-3) 78%)',
+                          border: '1px solid color-mix(in srgb, var(--accent) 24%, var(--border))',
+                          borderRadius: 18,
+                          padding: 18,
+                          display: 'grid',
+                          gap: 16,
+                        }}
+                      >
+                        <div>
+                          <div style={{ color: 'var(--accent)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+                            Decision summary
+                          </div>
+                          <div style={{ color: 'var(--text)', fontSize: 22, fontWeight: 700, letterSpacing: '-0.03em', marginBottom: 6 }}>
+                            Final recommendation
+                          </div>
+                          <div style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.7 }}>
+                            This is the highest-signal takeaway from the workflow. The step details below show how the recommendation was built.
+                          </div>
+                        </div>
+
+                        {workflowDecisionHighlights.length > 0 ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                            {workflowDecisionHighlights.map((item) => (
+                              <div
+                                key={item.label}
+                                style={{
+                                  background: 'var(--bg)',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 16,
+                                  padding: '14px 14px 13px',
+                                  display: 'grid',
+                                  gap: 8,
+                                }}
+                              >
+                                <div style={{ color: 'var(--text-3)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                  {item.label}
+                                </div>
+                                <div style={{ color: 'var(--text)', fontSize: 15, fontWeight: 700, lineHeight: 1.45 }}>
+                                  {item.value}
+                                </div>
+                                <div style={{ color: 'var(--text-2)', fontSize: 12, lineHeight: 1.6 }}>
+                                  {item.detail}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <div
+                          style={{
+                            background: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 16,
+                            padding: 16,
+                          }}
+                        >
+                          <div style={{ color: 'var(--text-3)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                            Final memo
+                          </div>
+                          <div style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.8 }}>
+                            <RichContent content={runResult.final_output} />
+                          </div>
+                        </div>
+                      </div>
+                    ) : runResult.status ? (
+                      <AppStateCard
+                        eyebrow='Run needs attention'
+                        icon='⚠️'
+                        title='This workflow run did not finish cleanly'
+                        description='The run was saved, but the final recommendation is incomplete. Open the saved steps below to inspect where the workflow lost momentum.'
+                        tone='error'
+                        compact
+                        actions={selectedWorkflowId ? <StateActionButton label='Retry workflow' onClick={() => {
+                          const workflow = workflows.find((item) => item.id === selectedWorkflowId)
+                          if (workflow) {
+                            void handleRunWorkflow(workflow)
+                          }
+                        }} /> : undefined}
+                      />
+                    ) : null}
+
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                       <button onClick={() => void handleShareRun()} disabled={!runResult.id || sharingRun} style={secondaryButtonStyle}>
                         {sharingRun ? 'Sharing...' : 'Share report'}
@@ -1212,17 +1445,48 @@ export default function WorkflowsPage() {
                     </div>
 
                     <div style={{ display: 'grid', gap: 12 }}>
+                      <div style={{ color: 'var(--text)', fontSize: 18, fontWeight: 700 }}>
+                        Workflow steps
+                      </div>
                       {runResult.steps.map((step, index) => (
-                        <div key={`${step.agent_id}-${index}`} style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: 16, padding: 16 }}>
-                          <div style={{ color: 'var(--accent)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
-                            Step {index + 1}
+                        <div
+                          key={`${step.agent_id}-${index}`}
+                          style={{
+                            background: 'var(--bg-3)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 16,
+                            padding: 16,
+                            display: 'grid',
+                            gap: 12,
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                            <div>
+                              <div style={{ color: 'var(--accent)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+                                Step {index + 1}
+                              </div>
+                              <div style={{ color: 'var(--text)', fontSize: 17, fontWeight: 700, marginBottom: 6 }}>
+                                {step.agent_name}
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                background: 'var(--bg)',
+                                border: '1px solid var(--border)',
+                                borderRadius: 12,
+                                padding: '10px 12px',
+                                maxWidth: 340,
+                              }}
+                            >
+                              <div style={{ color: 'var(--text-3)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+                                Step takeaway
+                              </div>
+                              <div style={{ color: 'var(--text-2)', fontSize: 12, lineHeight: 1.65 }}>
+                                {getExcerpt(step.output, 180)}
+                              </div>
+                            </div>
                           </div>
-                          <div style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700, marginBottom: 10 }}>
-                            {step.agent_name}
-                          </div>
-                          <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 8 }}>
-                            Output
-                          </div>
+
                           <div style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.8 }}>
                             <RichContent content={step.output} />
                           </div>
