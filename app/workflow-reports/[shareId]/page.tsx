@@ -13,6 +13,12 @@ interface SharedWorkflowReport {
   workflow_name: string
   title: string
   content: string
+  steps: Array<{
+    agent_id: number
+    agent_name: string
+    prompt: string
+    output: string
+  }>
   share_id: string
   created_at: string
 }
@@ -122,6 +128,25 @@ export default function SharedWorkflowReportPage({ params }: { params: Promise<{
           </h1>
           <div style={{ color: 'var(--text-2)', fontSize: 15, lineHeight: 1.85 }}>
             <RichContent content={report.content} />
+          </div>
+
+          <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid var(--border)', display: 'grid', gap: 18 }}>
+            <div style={{ color: 'var(--text-3)', fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              Workflow Steps
+            </div>
+            {report.steps.map((step, index) => (
+              <div key={`${step.agent_id}-${index}`} style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', borderRadius: 18, padding: 20 }}>
+                <div style={{ color: 'var(--accent)', fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Step {index + 1}
+                </div>
+                <div style={{ color: 'var(--text)', fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
+                  {step.agent_name}
+                </div>
+                <div style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.8 }}>
+                  <RichContent content={step.output} />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
