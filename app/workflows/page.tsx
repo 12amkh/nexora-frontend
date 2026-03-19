@@ -116,6 +116,14 @@ function getExcerpt(content: string, maxLength = 180) {
   return plain.length > maxLength ? `${plain.slice(0, maxLength - 3).trimEnd()}...` : plain
 }
 
+function extractFirstAvailableSection(sources: Array<string | undefined>, headings: string[]) {
+  for (const source of sources) {
+    const value = extractSectionContent(source || '', headings)
+    if (value) return value
+  }
+  return ''
+}
+
 function getWorkflowErrorGuidance(error: string) {
   const normalized = error.toLowerCase()
 
@@ -251,10 +259,23 @@ export default function WorkflowsPage() {
   const workflowDecisionHighlights = useMemo<WorkflowDecisionHighlight[]>(() => {
     if (!runResult?.final_output) return []
 
-    const winningOpportunity = extractSectionContent(runResult.final_output, ['Winning Opportunity', 'Best Opportunity'])
-    const targetUser = extractSectionContent(runResult.final_output, ['Target User', 'Target Market'])
-    const buildFirst = extractSectionContent(runResult.final_output, ['What To Build First', 'What to Build First'])
-    const whyNow = extractSectionContent(runResult.final_output, ['Why this works NOW', 'Why It Wins', 'Why Now'])
+    const sources = [
+      runResult.final_output,
+      ...runResult.steps.map((step) => step.output).reverse(),
+    ]
+
+    const winningOpportunity =
+      extractFirstAvailableSection(sources, ['Winning Opportunity', 'Best Opportunity', 'Startup Idea']) ||
+      getExcerpt(runResult.final_output, 120)
+    const targetUser =
+      extractFirstAvailableSection(sources, ['Target User', 'Target Market', 'Business Buyer']) ||
+      'Review the workflow steps below to confirm the strongest buyer.'
+    const buildFirst =
+      extractFirstAvailableSection(sources, ['What To Build First', 'What to Build First', 'Immediate Next Steps', 'Solution']) ||
+      'The final memo did not name a specific build step.'
+    const whyNow =
+      extractFirstAvailableSection(sources, ['Why this works NOW', 'Why It Wins', 'Why Now', 'Opportunity', 'Key Insights', 'Analysis']) ||
+      'The run did not surface a clean timing signal in a dedicated section.'
 
     return [
       {
