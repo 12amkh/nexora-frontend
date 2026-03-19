@@ -73,9 +73,48 @@ interface WorkflowDecisionHighlight {
 
 const SELECTED_WORKFLOW_STORAGE_KEY = 'nexora_selected_workflow_id'
 const SELECTED_WORKFLOW_RUN_STORAGE_KEY = 'nexora_selected_workflow_run_id'
+const WORKFLOW_SECTION_HEADINGS = [
+  'winning opportunity',
+  'best opportunity',
+  'target user',
+  'target market',
+  'business buyer',
+  'exact workflow being automated',
+  'what to build first',
+  'immediate next steps',
+  'why this works now',
+  'why it wins',
+  'why now',
+  'business model',
+  '30-day plan',
+  'startup idea',
+  'problem',
+  'solution',
+  'opportunity',
+  'summary',
+  'key insights',
+  'analysis',
+  'sources',
+  'conclusion',
+  'trends',
+  'assumptions',
+  'competitive landscape',
+  'opportunities',
+  'strategic takeaways',
+]
 
 function normalizeTextBlock(value?: string | null) {
   return (value || '').replace(/\r/g, '').trim()
+}
+
+function normalizeHeadingText(line: string) {
+  return line
+    .trim()
+    .replace(/^#{1,6}\s*/, '')
+    .replace(/^\d+[\.\)]\s*/, '')
+    .replace(/\s*:\s*$/, '')
+    .trim()
+    .toLowerCase()
 }
 
 function extractSectionContent(content: string, headings: string[]) {
@@ -84,27 +123,22 @@ function extractSectionContent(content: string, headings: string[]) {
 
   const lines = normalized.split('\n')
   const normalizedHeadings = headings.map((heading) => heading.toLowerCase())
-  let active = false
+  const headingSet = new Set(WORKFLOW_SECTION_HEADINGS)
+  const startIndex = lines.findIndex((line) => normalizedHeadings.includes(normalizeHeadingText(line)))
+
+  if (startIndex === -1) return ''
+
   const collected: string[] = []
 
-  for (const rawLine of lines) {
-    const line = rawLine.trim()
-    const headingMatch = line.match(/^(?:#{1,6}\s*)?(?:\d+[\.\)]\s*)?(.+?)\s*:?$/)
-    const headingText = headingMatch?.[1]?.trim().toLowerCase() || ''
-    const isKnownHeading = normalizedHeadings.includes(headingText)
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const rawLine = lines[index]
+    const normalizedLine = normalizeHeadingText(rawLine)
 
-    if (isKnownHeading) {
-      active = true
-      continue
-    }
-
-    if (active && headingMatch && /^(?:#{1,6}\s*)?(?:\d+[\.\)]\s*)?[A-Za-z].*$/.test(line) && !line.startsWith('-') && !line.startsWith('*') && !line.startsWith('•')) {
+    if (normalizedLine && headingSet.has(normalizedLine)) {
       break
     }
 
-    if (active) {
-      collected.push(rawLine)
-    }
+    collected.push(rawLine)
   }
 
   return collected.join('\n').trim()
