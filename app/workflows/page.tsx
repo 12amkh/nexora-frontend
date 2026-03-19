@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { jsPDF } from 'jspdf'
 
 import Sidebar from '@/components/Sidebar'
@@ -70,6 +70,7 @@ const SELECTED_WORKFLOW_RUN_STORAGE_KEY = 'nexora_selected_workflow_run_id'
 
 export default function WorkflowsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { pushToast, updateToast } = useToast()
   const [agents, setAgents] = useState<Agent[]>([])
   const [workflows, setWorkflows] = useState<Workflow[]>([])
@@ -93,6 +94,7 @@ export default function WorkflowsPage() {
   const [runHistoryError, setRunHistoryError] = useState('')
   const [sharingRun, setSharingRun] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
+  const featuredTemplateId = searchParams.get('template')?.trim() ?? ''
 
   const loadData = async () => {
     setLoading(true)
@@ -159,6 +161,19 @@ export default function WorkflowsPage() {
   }, [runResult])
 
   const agentMap = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents])
+  const featuredTemplate = useMemo(
+    () => templates.find((template) => template.id === featuredTemplateId) || null,
+    [templates, featuredTemplateId],
+  )
+  const orderedTemplates = useMemo(() => {
+    if (!featuredTemplateId) return templates
+
+    return [...templates].sort((left, right) => {
+      if (left.id === featuredTemplateId) return -1
+      if (right.id === featuredTemplateId) return 1
+      return 0
+    })
+  }, [templates, featuredTemplateId])
 
   const resetForm = () => {
     setSelectedWorkflowId(null)
@@ -707,6 +722,82 @@ export default function WorkflowsPage() {
             />
           ) : (
             <div style={{ display: 'grid', gap: 22 }}>
+              {featuredTemplate ? (
+                <section
+                  style={{
+                    background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--bg-2)) 0%, var(--bg-2) 70%)',
+                    border: '1px solid color-mix(in srgb, var(--accent) 24%, var(--border))',
+                    borderRadius: 18,
+                    padding: 18,
+                    display: 'grid',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    <div style={{ maxWidth: 780 }}>
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '7px 12px',
+                          borderRadius: 999,
+                          background: 'rgba(217,121,85,0.12)',
+                          color: 'var(--accent)',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          marginBottom: 12,
+                        }}
+                      >
+                        Recommended starting point
+                      </div>
+                      <div style={{ color: 'var(--text)', fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: '-0.03em' }}>
+                        {featuredTemplate.title}
+                      </div>
+                      <div style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.75 }}>
+                        {featuredTemplate.description} Use it when you want the fastest path from raw market input to a more opinionated recommendation.
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => void handleApplyTemplate(featuredTemplate)}
+                      disabled={applyingTemplateId === featuredTemplate.id}
+                      style={{ ...primaryButtonStyle, minWidth: 170 }}
+                    >
+                      {applyingTemplateId === featuredTemplate.id ? 'Creating...' : 'Use this template'}
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                    {featuredTemplate.steps.map((step, index) => (
+                      <div
+                        key={`${featuredTemplate.id}-${step.name}`}
+                        style={{
+                          background: 'var(--bg)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 16,
+                          padding: 14,
+                          display: 'grid',
+                          gap: 6,
+                        }}
+                      >
+                        <div style={{ color: 'var(--accent)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                          Step {index + 1}
+                        </div>
+                        <div style={{ color: 'var(--text)', fontSize: 15, fontWeight: 700 }}>
+                          {step.name}
+                        </div>
+                        <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.65 }}>
+                          {step.description}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
               <section
                 style={{
                   background: 'var(--bg-2)',
@@ -738,16 +829,17 @@ export default function WorkflowsPage() {
                   />
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
-                    {templates.map((template) => (
+                    {orderedTemplates.map((template) => (
                       <div
                         key={template.id}
                         style={{
                           background: 'var(--bg-3)',
-                          border: '1px solid var(--border)',
+                          border: template.id === featuredTemplateId ? '1px solid color-mix(in srgb, var(--accent) 42%, var(--border))' : '1px solid var(--border)',
                           borderRadius: 16,
                           padding: 16,
                           display: 'grid',
                           gap: 12,
+                          boxShadow: template.id === featuredTemplateId ? '0 10px 30px rgba(217, 121, 85, 0.08)' : 'none',
                         }}
                       >
                         <div>

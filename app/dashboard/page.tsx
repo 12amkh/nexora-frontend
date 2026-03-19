@@ -74,6 +74,38 @@ interface RecentInsight {
   created_at: string;
 }
 
+interface WorkflowStarter {
+  id: string;
+  title: string;
+  description: string;
+  label: string;
+  steps: string[];
+}
+
+const WORKFLOW_STARTERS: WorkflowStarter[] = [
+  {
+    id: "trend-insight-weekly-report",
+    title: "Startup Opportunity Finder",
+    description: "Best when you want one sharp opportunity, not a pile of research. This flow turns market shifts into a single build recommendation and execution plan.",
+    label: "Founder favorite",
+    steps: ["Trend Research", "Insight Analysis", "Final Recommendation"],
+  },
+  {
+    id: "competitor-strategy-action-plan",
+    title: "Competitor Gap Workflow",
+    description: "Use this when you want to spot weak coverage, copy gaps, or overlooked positioning moves competitors are missing.",
+    label: "Positioning",
+    steps: ["Competitor Research", "Strategy Analysis", "Action Plan"],
+  },
+  {
+    id: "market-research-startup-summary",
+    title: "Market-to-Idea Workflow",
+    description: "Use this when you already have a market in mind and want Nexora to narrow it into concrete startup wedges worth testing.",
+    label: "New concepts",
+    steps: ["Market Research", "Idea Generation", "Decision Report"],
+  },
+];
+
 function buildDefaultRunPrompt(agent: Agent) {
   const type = agent.config?.agent_type || "custom";
 
@@ -963,6 +995,166 @@ export default function Dashboard() {
           </div>
 
           <UsageStats />
+
+          <section
+            style={{
+              marginBottom: 28,
+              background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 13%, var(--bg-2)) 0%, var(--bg-2) 72%)",
+              border: "1px solid color-mix(in srgb, var(--accent) 24%, var(--border))",
+              borderRadius: 22,
+              padding: 22,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 18,
+                marginBottom: 18,
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ maxWidth: 760 }}>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "7px 12px",
+                    borderRadius: 999,
+                    background: "rgba(217,121,85,0.12)",
+                    color: "var(--accent)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    marginBottom: 12,
+                  }}
+                >
+                  Workflow Quick Start
+                </div>
+                <h2
+                  style={{
+                    margin: "0 0 8px",
+                    fontSize: 24,
+                    fontWeight: 700,
+                    color: "var(--text)",
+                    letterSpacing: "-0.03em",
+                  }}
+                >
+                  Use Nexora for one clear decision, not just more research
+                </h2>
+                <p style={{ margin: 0, color: "var(--text-2)", fontSize: 15, lineHeight: 1.75 }}>
+                  These workflow starters are the fastest path to the product’s strongest outcome: a narrow opportunity, a clear recommendation, and something real you can build or sell next.
+                </p>
+              </div>
+              <Link
+                href="/workflows"
+                style={{
+                  padding: "11px 16px",
+                  borderRadius: 14,
+                  background: "var(--accent)",
+                  color: "#fff",
+                  textDecoration: "none",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Open workflow studio
+              </Link>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: 14,
+              }}
+            >
+              {WORKFLOW_STARTERS.map((workflow) => (
+                <Link
+                  key={workflow.id}
+                  href={`/workflows?template=${workflow.id}`}
+                  style={{
+                    background: "var(--bg)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 18,
+                    padding: 18,
+                    textDecoration: "none",
+                    display: "grid",
+                    gap: 12,
+                    boxShadow: "0 8px 30px rgba(15, 23, 42, 0.04)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ color: "var(--text)", fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
+                        {workflow.title}
+                      </div>
+                      <div style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.7 }}>
+                        {workflow.description}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        background: "var(--accent-g)",
+                        color: "var(--accent)",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.05em",
+                        textTransform: "uppercase",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {workflow.label}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {workflow.steps.map((step, index) => (
+                      <div
+                        key={`${workflow.id}-${step}`}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          color: "var(--text-3)",
+                          fontSize: 12,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 999,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "var(--bg-3)",
+                            border: "1px solid var(--border)",
+                            color: "var(--accent)",
+                            fontWeight: 700,
+                            fontSize: 11,
+                          }}
+                        >
+                          {index + 1}
+                        </span>
+                        <span>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ color: "var(--accent)", fontSize: 13, fontWeight: 700 }}>
+                    Start this workflow →
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
 
           <section style={{ marginBottom: 28 }}>
             <div
