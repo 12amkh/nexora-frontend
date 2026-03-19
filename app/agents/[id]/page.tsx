@@ -15,21 +15,6 @@ import RichContent, { parseRichContent } from '@/components/RichContent'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-const QUICK_ACTIONS = [
-  {
-    label: 'Get AI Trends',
-    prompt: 'Give me the most important AI trends right now, what is driving them, and what to watch next.',
-  },
-  {
-    label: 'Market Opportunities',
-    prompt: 'Analyze current market opportunities in this space and highlight the strongest gaps, demand signals, and business angles.',
-  },
-  {
-    label: 'Startup Ideas',
-    prompt: 'Generate strong startup ideas based on current trends, unmet needs, and practical opportunities I could explore.',
-  },
-]
-
 interface Message {
   role: 'user' | 'assistant'
   content: string
@@ -101,6 +86,121 @@ function buildFollowUpPrompts(messages: Message[]): Array<{ label: string; promp
   ]
 }
 
+function getQuickActions(agent: Agent | null): Array<{ label: string; prompt: string }> {
+  const normalizedName = agent?.name.toLowerCase() || ''
+  const agentType = agent?.config?.agent_type || 'custom'
+
+  if (normalizedName.includes('ai trend monitor')) {
+    return [
+      { label: 'Scan AI launches', prompt: 'Scan the latest AI launches, model releases, and funding moves. Tell me what changed, why it matters now, and what signal is strongest.' },
+      { label: 'Find market shifts', prompt: 'Identify the most important AI market shifts right now, including adoption changes, pricing moves, and product direction changes worth tracking.' },
+      { label: 'Spot startup wedges', prompt: 'Turn the latest AI shifts into 3 specific startup wedges with target users, workflow pain, and why now.' },
+    ]
+  }
+
+  if (normalizedName.includes('competitor analyzer') || agentType === 'competitor_analyst') {
+    return [
+      { label: 'Analyze competitor', prompt: 'Analyze one competitor in depth: positioning, pricing, product strengths, weak spots, and where they are vulnerable.' },
+      { label: 'Compare offers', prompt: 'Compare the strongest competitors in this market and show the clearest gaps in product, messaging, and pricing.' },
+      { label: 'Find positioning gaps', prompt: 'Find overlooked positioning or workflow gaps a new startup could exploit against current competitors.' },
+    ]
+  }
+
+  if (normalizedName.includes('startup idea generator')) {
+    return [
+      { label: 'Generate startup wedges', prompt: 'Generate 3 wedge-based startup ideas tied to a real workflow, target user, pain point, and simple MVP that a small team can build.' },
+      { label: 'Find underserved niche', prompt: 'Find one underserved niche with painful manual work, explain why existing tools fail, and propose a startup idea for it.' },
+      { label: 'Turn trend into idea', prompt: 'Take one current trend and convert it into a specific startup concept with target user, problem, and what to build first.' },
+    ]
+  }
+
+  if (normalizedName.includes('market research agent')) {
+    return [
+      { label: 'Map this market', prompt: 'Map this market with demand signals, active buyers, friction points, and the most promising startup opportunities.' },
+      { label: 'Find workflow gaps', prompt: 'Identify manual workflows, operational pain points, and inefficiencies in this market that a startup could solve.' },
+      { label: 'Surface demand signals', prompt: 'Show the strongest concrete demand signals, constraints, and timing factors that matter in this market right now.' },
+    ]
+  }
+
+  if (normalizedName.includes('product strategy agent')) {
+    return [
+      { label: 'Prioritize best wedge', prompt: 'Review these opportunities and tell me which one deserves to be built first, with reasoning, tradeoffs, and execution focus.' },
+      { label: 'Sharpen positioning', prompt: 'Turn this product idea into a sharper positioning strategy with target user, wedge, differentiation, and first roadmap priorities.' },
+      { label: 'Plan MVP scope', prompt: 'Define a realistic MVP scope for this idea with what to build first, what to cut, and what success should look like.' },
+    ]
+  }
+
+  if (normalizedName.includes('content creation agent') || agentType === 'content_writer') {
+    return [
+      { label: 'Create content brief', prompt: 'Create a strong content brief with hook, angle, structure, audience, and call to action based on this topic.' },
+      { label: 'Draft launch post', prompt: 'Draft a sharp launch post for this product or idea with a strong opening, useful detail, and clear CTA.' },
+      { label: 'Turn research into content', prompt: 'Turn this research into 3 content angles with audience fit, key points, and why each angle works.' },
+    ]
+  }
+
+  if (normalizedName.includes('seo research agent')) {
+    return [
+      { label: 'Find keyword gaps', prompt: 'Find SEO keyword gaps in this niche, grouped by intent, opportunity, and what pages should exist.' },
+      { label: 'Map topic cluster', prompt: 'Build a topic cluster for this market with pillar ideas, supporting content, and intent-based structure.' },
+      { label: 'Analyze search intent', prompt: 'Break down the main search intent patterns in this space and show what content would win.' },
+    ]
+  }
+
+  if (normalizedName.includes('automation planner')) {
+    return [
+      { label: 'Design workflow', prompt: 'Design a practical automation workflow for this business problem, including trigger, steps, outputs, owner, and failure cases.' },
+      { label: 'Find bottlenecks', prompt: 'Identify the most manual, repetitive bottlenecks in this workflow and show what should be automated first.' },
+      { label: 'Plan automation', prompt: 'Plan an AI-assisted automation for this use case with inputs, outputs, systems involved, and what a realistic v1 would look like.' },
+    ]
+  }
+
+  if (normalizedName.includes('customer insights agent')) {
+    return [
+      { label: 'Extract pain points', prompt: 'Extract the main customer pain points, recurring frustrations, and unmet needs from this feedback or context.' },
+      { label: 'Find objections', prompt: 'Summarize the main objections, trust barriers, and hesitation patterns customers are showing.' },
+      { label: 'Highlight themes', prompt: 'Turn this customer feedback into product or messaging opportunities with clear themes and next steps.' },
+    ]
+  }
+
+  if (normalizedName.includes('weekly intelligence report') || normalizedName.includes('weekly report')) {
+    return [
+      { label: 'Create decision memo', prompt: 'Turn the latest findings into a decision memo that selects the strongest opportunity, explains why it wins, and gives next steps.' },
+      { label: 'Pick best idea', prompt: 'Compare the current opportunities, rank them briefly, and tell me exactly which single idea is best to pursue now.' },
+      { label: 'Generate founder brief', prompt: 'Generate a founder-style weekly brief with the top signal, why it matters now, and the clearest action to take next.' },
+    ]
+  }
+
+  if (agentType === 'news_monitor') {
+    return [
+      { label: 'Scan latest shifts', prompt: 'Give me the most important recent developments, what changed, and what matters most right now.' },
+      { label: 'Find strongest signal', prompt: 'Find the strongest market or product signal in this space and explain why it matters now.' },
+      { label: 'Turn news into opportunity', prompt: 'Convert recent developments into startup or product opportunities with clear implications.' },
+    ]
+  }
+
+  if (agentType === 'web_researcher') {
+    return [
+      { label: 'Research this topic', prompt: 'Research this topic and give me the most useful takeaways, concrete signals, and sources.' },
+      { label: 'Find market gaps', prompt: 'Research this market and highlight workflow gaps, buyer pain, and startup opportunities.' },
+      { label: 'Compare what exists', prompt: 'Compare existing products or approaches in this space and show where the clearest gaps are.' },
+    ]
+  }
+
+  if (agentType === 'data_interpreter') {
+    return [
+      { label: 'Find hidden patterns', prompt: 'Analyze this information and find the hidden patterns, contradictions, and strongest strategic implications.' },
+      { label: 'Prioritize next move', prompt: 'Use this context to tell me what deserves attention first and why.' },
+      { label: 'Turn data into strategy', prompt: 'Transform this information into concrete strategy, priority decisions, and next steps.' },
+    ]
+  }
+
+  return [
+    { label: 'Get key insights', prompt: 'Give me the most important insights from this topic, what matters now, and the strongest next steps.' },
+    { label: 'Find opportunities', prompt: 'Analyze this context and surface the clearest opportunities, gaps, and actions worth pursuing.' },
+    { label: 'Generate ideas', prompt: 'Generate practical ideas, options, or approaches based on this context and explain which one stands out most.' },
+  ]
+}
+
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
@@ -126,6 +226,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
   const bottomRef = useRef<HTMLDivElement>(null)
   const recentContext = messages.slice(-4)
   const followUpActions = buildFollowUpPrompts(messages)
+  const quickActions = getQuickActions(agent)
   const requestedTab = searchParams.get('tab')
   const requestedReportId = searchParams.get('report')
 
@@ -717,7 +818,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         <>
           <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '900px', width: '100%', margin: '0 auto', alignSelf: 'center' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.25rem' }}>
-              {QUICK_ACTIONS.map(action => (
+              {quickActions.map(action => (
                 <button
                   key={action.label}
                   onClick={() => runQuickAction(action.prompt)}
@@ -841,7 +942,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                   ))}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.7rem' }}>
-                  {QUICK_ACTIONS.map(action => (
+                  {quickActions.map(action => (
                     <button
                       key={`empty-${action.label}`}
                       onClick={() => runQuickAction(action.prompt)}
