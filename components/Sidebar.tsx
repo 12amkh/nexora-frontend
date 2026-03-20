@@ -15,7 +15,6 @@ const PLAN_COLORS: Record<string, string> = {
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "🤖  Agents" },
-  { href: "/startup-ideas", label: "💡  Startup Ideas" },
   { href: "/workflows", label: "🔗  Workflows" },
   { href: "/marketplace", label: "🛍️  Marketplace" },
   { href: "/schedules", label: "⏰  Schedules" },

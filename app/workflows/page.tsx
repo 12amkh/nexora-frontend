@@ -79,6 +79,13 @@ const WORKFLOW_INPUT_EXAMPLES = [
   'B2B opportunity in dental clinics',
 ]
 const WORKFLOW_SECTION_HEADINGS = [
+  'winning startup',
+  'who is this for',
+  'core problem',
+  'what to build',
+  'reality check',
+  'idea score',
+  'first step',
   'winning opportunity',
   'best opportunity',
   'target user',
@@ -304,16 +311,16 @@ export default function WorkflowsPage() {
     ]
 
     const winningOpportunity =
-      extractFirstAvailableSection(sources, ['Winning Opportunity', 'Best Opportunity', 'Startup Idea']) ||
+      extractFirstAvailableSection(sources, ['Winning Startup', 'Winning Opportunity', 'Best Opportunity']) ||
       getExcerpt(runResult.final_output, 120)
     const targetUser =
-      extractFirstAvailableSection(sources, ['Target User', 'Target Market', 'Business Buyer']) ||
+      extractFirstAvailableSection(sources, ['Who is this for', 'Target User', 'Target Market', 'Business Buyer']) ||
       'Review the workflow steps below to confirm the strongest buyer.'
     const buildFirst =
-      extractFirstAvailableSection(sources, ['What To Build First', 'What to Build First', 'Immediate Next Steps', 'Solution']) ||
+      extractFirstAvailableSection(sources, ['What to Build', 'What To Build First', 'What to Build First', 'Immediate Next Steps', 'Solution']) ||
       'The final memo did not name a specific build step.'
     const whyNow =
-      extractFirstAvailableSection(sources, ['Why this works NOW', 'Why It Wins', 'Why Now', 'Opportunity', 'Key Insights', 'Analysis']) ||
+      extractFirstAvailableSection(sources, ['Why this works NOW', 'Why This Works Now', 'Why It Wins', 'Why Now', 'Opportunity', 'Key Insights', 'Analysis']) ||
       'The run did not surface a clean timing signal in a dedicated section.'
 
     return [
