@@ -74,6 +74,21 @@ const WORKFLOW_STARTERS: WorkflowStarter[] = [
   },
 ];
 
+const OPPORTUNITY_ENGINE_POINTS = [
+  {
+    label: "Research the market",
+    detail: "Find live shifts, workflow pain, and buyer pressure instead of broad trend noise.",
+  },
+  {
+    label: "Narrow the wedge",
+    detail: "Turn raw market context into a specific startup opportunity with a real buyer and workflow.",
+  },
+  {
+    label: "Decide what to build",
+    detail: "Finish with one recommendation, a build-first MVP, and clear next steps.",
+  },
+];
+
 function buildDefaultRunPrompt(agent: Agent) {
   const type = agent.config?.agent_type || "custom";
 
@@ -750,19 +765,37 @@ export default function Dashboard() {
         <div className="app-shell-content">
           <div className="dashboard-header">
             <div>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: "var(--accent-g)",
+                  color: "var(--accent)",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  marginBottom: 12,
+                }}
+              >
+                Startup Opportunity Engine
+              </div>
               <h1
                 style={{
-                  fontSize: 28,
+                  fontSize: 34,
                   fontWeight: 700,
                   color: "var(--text)",
                   margin: "0 0 8px",
                   letterSpacing: "-0.03em",
                 }}
               >
-                Dashboard
+                Find the best startup opportunity and what to build next
               </h1>
-              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 16 }}>
-                Welcome back, {user.name}!
+              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 16, lineHeight: 1.75, maxWidth: 760 }}>
+                Welcome back, {user.name}. The fastest path in Nexora is simple: choose a market, run a focused workflow, and turn raw signals into one strong wedge with a build plan.
               </p>
             </div>
             <div className="dashboard-header-actions">
@@ -792,6 +825,61 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+
+          <section
+            style={{
+              marginBottom: 28,
+              background: "var(--bg-2)",
+              border: "1px solid var(--border)",
+              borderRadius: 22,
+              padding: 20,
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 14,
+              }}
+            >
+              {OPPORTUNITY_ENGINE_POINTS.map((item, index) => (
+                <div
+                  key={item.label}
+                  style={{
+                    background: "var(--bg)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 18,
+                    padding: 16,
+                    display: "grid",
+                    gap: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 999,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "var(--accent-g)",
+                      color: "var(--accent)",
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {index + 1}
+                  </div>
+                  <div style={{ color: "var(--text)", fontSize: 16, fontWeight: 700 }}>
+                    {item.label}
+                  </div>
+                  <div style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.7 }}>
+                    {item.detail}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
 
           <UsageStats />
 

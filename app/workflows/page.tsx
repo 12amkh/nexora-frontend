@@ -73,6 +73,11 @@ interface WorkflowDecisionHighlight {
 
 const SELECTED_WORKFLOW_STORAGE_KEY = 'nexora_selected_workflow_id'
 const SELECTED_WORKFLOW_RUN_STORAGE_KEY = 'nexora_selected_workflow_run_id'
+const WORKFLOW_INPUT_EXAMPLES = [
+  'AI tools for independent restaurants',
+  'Workflow pain inside auto repair shops',
+  'B2B opportunity in dental clinics',
+]
 const WORKFLOW_SECTION_HEADINGS = [
   'winning opportunity',
   'best opportunity',
@@ -860,14 +865,105 @@ export default function WorkflowsPage() {
         <div className="app-shell-content">
           <div className="dashboard-header">
             <div>
-              <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)', margin: '0 0 8px', letterSpacing: '-0.03em' }}>
-                Agent Workflows
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  background: 'var(--accent-g)',
+                  color: 'var(--accent)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  marginBottom: 12,
+                }}
+              >
+                Core workflow studio
+              </div>
+              <h1 style={{ fontSize: 34, fontWeight: 700, color: 'var(--text)', margin: '0 0 8px', letterSpacing: '-0.03em' }}>
+                Turn a market into one clear startup opportunity
               </h1>
-              <p style={{ color: 'var(--text-2)', margin: 0, fontSize: 16 }}>
-                Chain multiple agents together, define the order, and pass each result into the next step automatically.
+              <p style={{ color: 'var(--text-2)', margin: 0, fontSize: 16, lineHeight: 1.75, maxWidth: 820 }}>
+                This is the strongest path in Nexora. Start with a market, niche, or workflow problem, let the chain research it, narrow the wedge, and finish with a decision memo that tells you what to build next.
               </p>
             </div>
           </div>
+
+          <section
+            style={{
+              marginBottom: 22,
+              background: 'var(--bg-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 18,
+              padding: 18,
+              display: 'grid',
+              gap: 14,
+            }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+              {[
+                {
+                  title: '1. Research',
+                  detail: 'Find specific workflow pain, constraints, and buyer pressure.',
+                },
+                {
+                  title: '2. Narrow',
+                  detail: 'Turn the market into startup wedges instead of broad ideas.',
+                },
+                {
+                  title: '3. Decide',
+                  detail: 'Select one winner, define the MVP, and map the next 30 days.',
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  style={{
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 16,
+                    padding: 16,
+                    display: 'grid',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ color: 'var(--text)', fontSize: 16, fontWeight: 700 }}>
+                    {item.title}
+                  </div>
+                  <div style={{ color: 'var(--text-2)', fontSize: 13, lineHeight: 1.7 }}>
+                    {item.detail}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-3)', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                Try a starting market
+              </span>
+              {WORKFLOW_INPUT_EXAMPLES.map((example) => (
+                <button
+                  key={example}
+                  type='button'
+                  onClick={() => setWorkflowInput(example)}
+                  style={{
+                    padding: '9px 13px',
+                    borderRadius: 999,
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-3)',
+                    color: 'var(--text)',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+          </section>
 
           {loading ? (
             <div style={{ color: 'var(--text-3)', fontSize: 14 }}>Loading workflows...</div>
